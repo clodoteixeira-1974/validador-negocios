@@ -2,6 +2,12 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 
+const {
+  registrarEvidencia,
+  listarEvidencias,
+  ARQUIVO_EVIDENCIAS
+} = require('./evidencias');
+
 const PORTA_PADRAO = 3000;
 const LIMITE_CORPO = '100kb';
 const SERVICO = 'validador-negocios';
@@ -11,6 +17,10 @@ const ARQUIVO_VALIDACOES = path.join(__dirname, 'validacoes.jsonl');
 
 // Palavras que classificam a ideia como mobile
 const PALAVRAS_MOBILE = ['app', 'aplicativo'];
+
+// Campos que o cliente pode enviar em POST /evidencias.
+// id e timestamp nao entram aqui: sao gerados pelo modulo evidencias.js.
+const CAMPOS_EVIDENCIA = ['tipo', 'fonte', 'url', 'trecho_bruto', 'ideia_relacionada', 'relevancia'];
 
 // Regra única de classificação
 function classificarTipo(ideia) {
@@ -53,6 +63,7 @@ function registrarValidacao(registro, arquivo = ARQUIVO_VALIDACOES) {
 // Opções: { arquivoValidacoes } para apontar a persistência para outro caminho.
 function createApp(opcoes = {}) {
   const arquivoValidacoes = opcoes.arquivoValidacoes || ARQUIVO_VALIDACOES;
+  const arquivoEvidencias = opcoes.arquivoEvidencias || ARQUIVO_EVIDENCIAS;
 
   const app = express();
 
@@ -100,6 +111,36 @@ function createApp(opcoes = {}) {
     return res.status(405).json({ error: 'Metodo nao permitido', permitido: 'POST' });
   });
 
+  // Lista as evidencias gravadas
+  app.get('/evidencias', (req, res) => {
+    const evidencias = listarEvidencias(arquivoEvidencias);
+    return res.json({ total: evidencias.length, evidencias });
+  });
+
+  // Registra uma evidencia. id e timestamp sao gerados pelo modulo, nunca
+  // aceitos do cliente. O modulo lanca Error com .erros quando a evidencia e invalida.
+  app.post('/evidencias', (req, res) => {
+    const corpo = req.body;
+    const dados = {};
+
+    for (const campo of CAMPOS_EVIDENCIA) {
+      dados[campo] = corpo ? corpo[campo] : undefined;
+    }
+
+    try {
+      const gravada = registrarEvidencia(dados, arquivoEvidencias);
+      return res.status(201).json(gravada);
+    } catch (erro) {
+      return res.status(400).json({ error: erro.message });
+    }
+  });
+
+  // Qualquer outro metodo em /evidencias: 405 com Allow: GET, POST
+  app.all('/evidencias', (req, res) => {
+    res.set('Allow', 'GET, POST');
+    return res.status(405).json({ error: 'Metodo nao permitido', permitido: 'GET, POST' });
+  });
+
   // Rota desconhecida
   app.use((req, res) => {
     res.status(404).json({ error: 'Rota nao encontrada', caminho: req.path });
@@ -131,7 +172,9 @@ if (require.main === module) {
     console.log(`Servidor rodando na porta ${port}`);
     console.log(`Healthcheck: GET http://localhost:${port}/saude`);
     console.log(`Endpoint: POST http://localhost:${port}/validar-ideia`);
+    console.log(`Evidencias: GET/POST http://localhost:${port}/evidencias`);
     console.log(`Persistindo em: ${ARQUIVO_VALIDACOES}`);
+    console.log(`Evidencias em: ${ARQUIVO_EVIDENCIAS}`);
   });
 }
 
@@ -141,8 +184,10 @@ module.exports = {
   validarIdeia,
   registrarValidacao,
   ARQUIVO_VALIDACOES,
+  ARQUIVO_EVIDENCIAS,
   PORTA_PADRAO,
   LIMITE_CORPO,
   SERVICO,
-  PALAVRAS_MOBILE
+  PALAVRAS_MOBILE,
+  CAMPOS_EVIDENCIA
 };
