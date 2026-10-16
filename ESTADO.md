@@ -3,19 +3,38 @@
 Documento de memória de trabalho. Qualquer pessoa (ou IA) que abrir este repositório
 começa por aqui para saber onde o projeto está.
 
+## Regras do projeto
+
+Estas regras valem para todas as tarefas, a partir da Tarefa 14.
+
+- **Toda tarefa de código inclui a atualização de `README.md` e `ESTADO.md` no mesmo
+  commit.** Não vale abrir tarefa separada para isso: a documentação ficou para trás duas
+  vezes seguidas (Tarefas 11 e 13) e custou trabalho de correção.
+- **Cada tarefa gera um relatório** em `relatorios/`, com o nome
+  `tarefa-NN-descricao.md`.
+- **Todo relatório termina com a confirmação de existência e tamanho**, com a saída real
+  de `Test-Path` e de `(Get-Item ...).Length`.
+- **Testes manuais com `curl.exe` não são usados neste ambiente.** O PowerShell 5.1 quebra
+  o escaping das aspas duplas e os processos iniciados em segundo plano morrem ao fim da
+  sessão. A verificação é feita por testes automatizados, que sobem o servidor em porta
+  efêmera e fazem requisições HTTP reais.
+- **Cole a saída real dos comandos. Não invente números.**
+
 ## O que é o produto
 
 O Validador de Novos Negócios é um serviço HTTP que recebe a descrição de uma ideia de
 negócio, classifica o tipo dela e registra a validação com data e hora. Ele também recebe
-e lista evidências de mercado (concorrentes, reclamações de usuários e dados de setor).
-Em etapas futuras, deve cruzar a ideia com essas evidências para produzir uma nota de
-viabilidade. Hoje ele valida, classifica e guarda as evidências; a parte de inteligência
-de mercado ainda não existe.
+e lista evidências de mercado (concorrentes, reclamações de usuários e dados de setor) e
+calcula uma nota de viabilidade a partir delas. Hoje ele valida, classifica, guarda as
+evidências e aplica o primeiro critério da régua; a coleta de dados de verdade e o
+relatório final ainda não existem.
 
 ## O que existe hoje
 
 - Endpoint `POST /validar-ideia`
 - Endpoints `POST /evidencias` e `GET /evidencias` (integrados ao `server.js`)
+- Endpoint `GET /nota` (primeiro critério da régua: "tem gente?")
+- Módulo `nota.js` com a função `calcularNota(evidencias)`, sem I/O e sem dependências
 - Classificação mobile/outro (palavras-chave `app`, `aplicativo`)
 - Persistência em `validacoes.jsonl` e `evidencias.jsonl`
 - Módulo `evidencias.js`, com caminho de arquivo injetável para que os testes não toquem
@@ -23,15 +42,16 @@ de mercado ainda não existe.
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 26 testes automatizados (19 em `server.test.js` + 7 em `evidencias.test.js`)
+- 36 testes automatizados (23 em `server.test.js` + 7 em `evidencias.test.js` + 6 em
+  `nota.test.js`)
 
 ## O que não existe ainda
 
 Alinhado ao fluxograma do projeto:
 
+- Demais critérios da régua (4 dos 5 ainda não implementados)
 - Coleta real de concorrentes
 - Extração de reclamações
-- Cálculo de nota (régua)
 - Integração com LLM
 - RAG
 - Relatório em PDF
@@ -68,7 +88,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 
 - Servidor: não está rodando. Para iniciar: `npm start`
 - Porta padrão: 3000 (configurável via `PORT`)
-- Testes: `npm test` (26 passando)
+- Testes: `npm test` (36 passando)
 - Repositório GitHub: https://github.com/clodoteixeira-1974/validador-negocios
 - Branch principal: `main`
 
@@ -77,7 +97,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 26 testes automatizados
+npm test        # roda os 36 testes automatizados
 ```
 
 Exemplos de chamada:
@@ -94,6 +114,8 @@ curl -X POST http://localhost:3000/evidencias \
   -d "{\"tipo\":\"concorrente\",\"fonte\":\"Google Play\",\"url\":\"https://exemplo\",\"trecho_bruto\":\"Trecho original\",\"ideia_relacionada\":\"App para controlar gastos\",\"relevancia\":\"alta\"}"
 
 curl http://localhost:3000/evidencias
+
+curl http://localhost:3000/nota
 ```
 
 Para usar outra porta: `PORT=8080 npm start` (Linux/macOS) ou
@@ -101,6 +123,6 @@ Para usar outra porta: `PORT=8080 npm start` (Linux/macOS) ou
 
 ## Próximo passo
 
-**Tarefa 12 — primeira nota determinística**: implementar o critério "tem gente?" do
-fluxograma. Se houver 2 ou mais concorrentes registrados como evidência, atribuir 1 ponto.
-É o primeiro dos cinco critérios da régua.
+**Tarefa 14 — segundo critério da régua**: "tem gente insatisfeita?". Se houver pelo menos
+1 reclamação registrada como evidência, atribuir 1 ponto. O total da nota precisa passar a
+ser a soma de todos os critérios implementados.

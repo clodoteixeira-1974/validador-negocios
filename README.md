@@ -1,14 +1,15 @@
 # Validador de Novos Negócios
 
-Um serviço HTTP que recebe a ideia de um novo negócio, classifica o tipo dela e registra
-a validação, e que também recebe e lista evidências de mercado. É o primeiro passo de um
-projeto maior: cruzar a ideia com essas evidências para dar uma nota de viabilidade.
+Um serviço HTTP que recebe a ideia de um novo negócio, classifica o tipo dela, registra a
+validação, recebe e lista evidências de mercado, e calcula uma nota de viabilidade a
+partir dessas evidências. É o primeiro passo de um projeto maior: cruzar a ideia com o
+mercado e dar um veredito.
 
 Repositório: https://github.com/clodoteixeira-1974/validador-negocios
 
 ## O que faz
 
-Hoje, o serviço faz três coisas:
+Hoje, o serviço faz quatro coisas:
 
 1. **Valida a ideia.** Você envia uma ideia em texto. O servidor confere se o pedido está
    bem formado e devolve uma resposta clara, seja aceito ou recusado.
@@ -16,6 +17,8 @@ Hoje, o serviço faz três coisas:
    como `mobile`. Caso contrário, como `outro`.
 3. **Guarda evidências de mercado.** É possível registrar concorrentes, reclamações de
    usuários e dados de setor, e depois listar tudo o que foi registrado.
+4. **Dá uma nota de viabilidade.** A nota é calculada a partir das evidências registradas,
+   aplicando um critério de cada vez e explicando como cada um chegou ao resultado.
 
 Cada validação aceita é gravada em um arquivo de registro com a ideia, o tipo e a data e
 hora. Cada evidência registrada é gravada em outro arquivo, com a fonte, o trecho
@@ -24,6 +27,11 @@ original, a ideia à qual se refere e o nível de relevância.
 As evidências são identificadas e datadas pelo próprio servidor: o cliente não escolhe o
 identificador nem a data, apenas o conteúdo da evidência. Um registro sem os campos
 obrigatórios é recusado com erro, e nada é gravado.
+
+A nota é um número de 0 a 5 pontos, dividido em cinco critérios. **O primeiro deles, "tem
+gente?", já está implementado**: ele conta os concorrentes registrados e concede o ponto
+quando há dois ou mais. Os outros quatro ainda não existem. Por enquanto a nota é geral,
+ou seja, considera todas as evidências guardadas, sem distinguir uma ideia da outra.
 
 O projeto foi construído em etapas pequenas, cada uma com testes automatizados e um
 relatório em `relatorios/` explicando o que foi feito e por quê.
@@ -50,7 +58,7 @@ Para rodar os testes:
 npm test
 ```
 
-São 26 testes automatizados, todos passando.
+São 36 testes automatizados, todos passando.
 
 Dois exemplos de chamada:
 
@@ -76,6 +84,12 @@ curl -X POST http://localhost:3000/evidencias \
 curl http://localhost:3000/evidencias
 ```
 
+E um exemplo de nota:
+
+```bash
+curl http://localhost:3000/nota
+```
+
 ## Endpoints
 
 | Método | Rota               | Resposta                                                                                             |
@@ -91,18 +105,40 @@ curl http://localhost:3000/evidencias
 | POST   | `/evidencias`      | `400` com `{"error": "..."}` quando falta um campo obrigatório, ou o `tipo` ou a `relevancia` não valem   |
 | GET    | `/evidencias`      | `200` com `{"total": N, "evidencias": [...]}`; com nada registrado, `{"total": 0, "evidencias": []}`     |
 | outro  | `/evidencias`      | `405` com o cabeçalho `Allow: GET, POST` — a rota não aceita esse método                                  |
+| GET    | `/nota`            | `200` com `{"criterios": {...}, "total": N, "maximo_possivel": N}` — a nota a partir das evidências     |
 | GET    | qualquer outra     | `404` com `{"error": "Rota nao encontrada", "caminho": "..."}`                                         |
 
 O corpo da resposta é sempre JSON, inclusive nos casos de erro.
+
+Um exemplo de resposta de `/nota`, com três concorrentes registrados:
+
+```json
+{
+  "criterios": {
+    "tem_gente": {
+      "pontos": 1,
+      "detalhe": "3 concorrentes registrados"
+    }
+  },
+  "total": 1,
+  "maximo_possivel": 1
+}
+```
+
+O campo `detalhe` diz como o ponto foi calculado, para que a nota não seja um número
+solto. Hoje `maximo_possivel` vale 1, porque só existe um critério implementado; ele
+cresce conforme os outros forem entrando.
 
 ## Estrutura do projeto
 
 | Arquivo                             | Função                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `server.js`                         | O serviço. Recebe requisições, valida, classifica, grava e devolve as respostas.                         |
-| `server.test.js`                    | 19 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
+| `server.test.js`                    | 23 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
 | `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações e dados de mercado.            |
 | `evidencias.test.js`                | 7 testes do módulo de evidências, também com arquivos temporários.                                       |
+| `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua às evidências registradas.                    |
+| `nota.test.js`                      | 6 testes do cálculo da nota, sem HTTP e sem disco.                                                        |
 | `testar-evidencias.js`              | Script de verificação manual do módulo de evidências.                                                     |
 | `package.json`                      | Nome do projeto e os comandos `start` e `test`.                                                          |
 | `validacoes.jsonl`                  | Registro das validações recebidas (gerado em execução, não versionado).                                  |
@@ -119,18 +155,19 @@ nativo do Node.js.
 
 ## Estado do projeto
 
-Fase intermediária: o serviço de validação e classificação está funcionando, e as rotas
-de evidências já estão integradas ao servidor, permitindo registrar e listar evidências de
-mercado. São 26 testes automatizados, todos passando.
+Fase intermediária: o serviço de validação e classificação está funcionando, as rotas de
+evidências estão integradas ao servidor, e o primeiro critério da régua de viabilidade já
+calcula a nota a partir das evidências registradas. São 36 testes automatizados, todos
+passando.
 
-O que ainda falta é a parte inteligente: coletar concorrentes e reclamações de verdade,
-cruzar isso com a ideia e calcular a nota de viabilidade.
+O que ainda falta: completar os outros quatro critérios da nota, coletar concorrentes e
+reclamações de verdade, e só então gerar o relatório final.
 
 ## Próximos passos
 
-- Calcular a primeira nota determinística ("tem gente?") a partir das evidências
+- Implementar o segundo critério da régua ("tem gente insatisfeita?")
+- Completar os quatro critérios restantes da nota de viabilidade
 - Coletar concorrentes reais e extrair reclamações de usuários
-- Completar os outros quatro critérios da nota de viabilidade
 - Integrar um modelo de linguagem e busca semântica (RAG)
 - Gerar relatório final em PDF
 - Interface web e publicação do serviço
