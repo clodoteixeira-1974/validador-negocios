@@ -9,6 +9,6 @@ desktop.ini
 body-tmp.json
 *.tmp
 
-# O padrão .env.* acima também pegaria .env.example, que deve ser versionado
-# como documentação das variáveis de ambiente.
+# The .env.* pattern above would also ignore .env.example, which must be
+# versioned as documentation of the environment variables.
 !.env.example
