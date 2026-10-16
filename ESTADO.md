@@ -6,27 +6,29 @@ começa por aqui para saber onde o projeto está.
 ## O que é o produto
 
 O Validador de Novos Negócios é um serviço HTTP que recebe a descrição de uma ideia de
-negócio, classifica o tipo dela, registra a validação com data e hora e, em etapas
-futuras, deve cruzar a ideia com evidências de mercado (concorrentes, reclamações de
-usuários e dados de setor) para produzir uma nota de viabilidade. Hoje ele valida e
-classifica; a parte de inteligência de mercado ainda não existe.
+negócio, classifica o tipo dela e registra a validação com data e hora. Ele também recebe
+e lista evidências de mercado (concorrentes, reclamações de usuários e dados de setor).
+Em etapas futuras, deve cruzar a ideia com essas evidências para produzir uma nota de
+viabilidade. Hoje ele valida, classifica e guarda as evidências; a parte de inteligência
+de mercado ainda não existe.
 
 ## O que existe hoje
 
 - Endpoint `POST /validar-ideia`
+- Endpoints `POST /evidencias` e `GET /evidencias` (integrados ao `server.js`)
 - Classificação mobile/outro (palavras-chave `app`, `aplicativo`)
-- Persistência em `validacoes.jsonl`
-- Módulo `evidencias.js` (não integrado ao servidor ainda), com caminho de arquivo
-  injetável para que os testes não toquem os dados de produção
+- Persistência em `validacoes.jsonl` e `evidencias.jsonl`
+- Módulo `evidencias.js`, com caminho de arquivo injetável para que os testes não toquem
+  os dados de produção
+- `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 20 testes automatizados (13 em `server.test.js` + 7 em `evidencias.test.js`)
+- 26 testes automatizados (19 em `server.test.js` + 7 em `evidencias.test.js`)
 
 ## O que não existe ainda
 
 Alinhado ao fluxograma do projeto:
 
-- Exposição de evidências via HTTP
 - Coleta real de concorrentes
 - Extração de reclamações
 - Cálculo de nota (régua)
@@ -66,7 +68,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 
 - Servidor: não está rodando. Para iniciar: `npm start`
 - Porta padrão: 3000 (configurável via `PORT`)
-- Testes: `npm test` (20 passando)
+- Testes: `npm test` (26 passando)
 - Repositório GitHub: https://github.com/clodoteixeira-1974/validador-negocios
 - Branch principal: `main`
 
@@ -75,7 +77,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 20 testes automatizados
+npm test        # roda os 26 testes automatizados
 ```
 
 Exemplos de chamada:
@@ -86,6 +88,12 @@ curl http://localhost:3000/saude
 curl -X POST http://localhost:3000/validar-ideia \
   -H "Content-Type: application/json" \
   -d "{\"ideia\":\"App para controlar gastos\"}"
+
+curl -X POST http://localhost:3000/evidencias \
+  -H "Content-Type: application/json" \
+  -d "{\"tipo\":\"concorrente\",\"fonte\":\"Google Play\",\"url\":\"https://exemplo\",\"trecho_bruto\":\"Trecho original\",\"ideia_relacionada\":\"App para controlar gastos\",\"relevancia\":\"alta\"}"
+
+curl http://localhost:3000/evidencias
 ```
 
 Para usar outra porta: `PORT=8080 npm start` (Linux/macOS) ou
@@ -93,7 +101,6 @@ Para usar outra porta: `PORT=8080 npm start` (Linux/macOS) ou
 
 ## Próximo passo
 
-**Tarefa 10 — expor evidências via HTTP**: criar `POST /evidencias` e `GET /evidencias`,
-conectando o módulo `evidencias.js` (já escrito e com 7 testes) ao servidor Express. As
-rotas devem passar o caminho do arquivo por parâmetro, como o módulo já faz, para que os
-testes continuem usando arquivos temporários.
+**Tarefa 12 — primeira nota determinística**: implementar o critério "tem gente?" do
+fluxograma. Se houver 2 ou mais concorrentes registrados como evidência, atribuir 1 ponto.
+É o primeiro dos cinco critérios da régua.
