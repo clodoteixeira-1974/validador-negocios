@@ -4,6 +4,8 @@ Um serviço HTTP que recebe a ideia de um novo negócio, classifica o tipo dela 
 a validação. É o primeiro passo de um projeto maior: cruzar a ideia com evidências de
 mercado para dar uma nota de viabilidade.
 
+Repositório: https://github.com/clodoteixeira-1974/validador-negocios
+
 ## O que faz
 
 Hoje, o serviço faz duas coisas:
@@ -75,7 +77,8 @@ O corpo da resposta é sempre JSON, inclusive nos casos de erro.
 | Arquivo                             | Função                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `server.js`                         | O serviço. Recebe requisições, valida, classifica, grava e devolve as respostas.                         |
-| `server.test.js`                    | Os 13 testes automatizados, usando o módulo de testes nativo do Node.js.                                  |
+| `server.test.js`                    | 13 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
+| `evidencias.test.js`                | 7 testes do módulo de evidências, também com arquivos temporários.                                       |
 | `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações e dados de mercado.            |
 | `testar-evidencias.js`              | Script de verificação manual do módulo de evidências.                                                     |
 | `package.json`                      | Nome do projeto e os comandos `start` e `test`.                                                          |
@@ -84,6 +87,7 @@ O corpo da resposta é sempre JSON, inclusive nos casos de erro.
 | `ESTADO.md`                         | Memória de trabalho do projeto: o que existe, o que falta e as decisões tomadas.                         |
 | `relatorios/`                       | Um relatório por tarefa, com o que foi feito e as justificativas.                                         |
 | `.gitignore`                        | Define o que não entra no repositório.                                                                   |
+| `.gitattributes`                    | Normaliza finais de linha para LF, para o repositório ficar igual em qualquer sistema.                  |
 | `Fluxograma de IA.svg`              | O fluxograma do projeto, que define as etapas planejadas.                                                 |
 | `Agente Validador*.pdf`             | Documentos de apoio do projeto.                                                                          |
 
@@ -92,8 +96,9 @@ nativo do Node.js.
 
 ## Estado do projeto
 
-Fase inicial: o serviço de validação e classificação está funcionando e coberto por 13
-testes que passam.
+Fase inicial: o serviço de validação e classificação está funcionando, e o módulo de
+evidências está pronto mas ainda não conectado ao servidor. São 20 testes automatizados,
+todos passando.
 
 ## Próximos passos
 
