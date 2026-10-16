@@ -8,6 +8,8 @@ const {
   ARQUIVO_EVIDENCIAS
 } = require('./evidencias');
 
+const { calcularNota } = require('./nota');
+
 const PORTA_PADRAO = 3000;
 const LIMITE_CORPO = '100kb';
 const SERVICO = 'validador-negocios';
@@ -133,6 +135,13 @@ function createApp(opcoes = {}) {
     } catch (erro) {
       return res.status(400).json({ error: erro.message });
     }
+  });
+
+  // Calcula a nota a partir das evidencias registradas. Por enquanto so existe
+  // o criterio "tem gente?". A nota e geral: conta todos os concorrentes.
+  app.get('/nota', (req, res) => {
+    const evidencias = listarEvidencias(arquivoEvidencias);
+    return res.json(calcularNota(evidencias));
   });
 
   // Qualquer outro metodo em /evidencias: 405 com Allow: GET, POST

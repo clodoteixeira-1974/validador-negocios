@@ -82,6 +82,11 @@ async function getEvidencias(base) {
   return { status: resposta.status, corpo: await resposta.json() };
 }
 
+async function getNota(base) {
+  const resposta = await fetch(`${base}/nota`);
+  return { status: resposta.status, corpo: await resposta.json() };
+}
+
 function evidenciaValida(extra = {}) {
   return Object.assign({
     tipo: 'concorrente',
@@ -337,6 +342,71 @@ test('nenhum teste de /evidencias grava no evidencias.jsonl de producao', async 
   await comServidor(async ({ base }) => {
     await postEvidencia(base, evidenciaValida({ fonte: 'Somente teste' }));
     await getEvidencias(base);
+  });
+
+  const depois = lerLinhas(ARQUIVO_EVIDENCIAS).length;
+
+  assert.equal(depois, antes);
+});
+
+test('GET /nota com arquivo de evidencias vazio: 200 com total 0', async () => {
+  await comServidor(async ({ base }) => {
+    const r = await getNota(base);
+
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.corpo, {
+      criterios: {
+        tem_gente: {
+          pontos: 0,
+          detalhe: 'Nenhum concorrente registrado. Minimo: 2.'
+        }
+      },
+      total: 0,
+      maximo_possivel: 1
+    });
+  });
+});
+
+test('GET /nota apos 2 concorrentes: 200 com tem_gente.pontos igual a 1', async () => {
+  await comServidor(async ({ base }) => {
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A' }));
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B' }));
+
+    const r = await getNota(base);
+
+    assert.equal(r.status, 200);
+    assert.equal(r.corpo.criterios.tem_gente.pontos, 1);
+    assert.equal(r.corpo.criterios.tem_gente.detalhe, '2 concorrentes registrados');
+    assert.equal(r.corpo.total, 1);
+    assert.equal(r.corpo.maximo_possivel, 1);
+  });
+});
+
+test('GET /nota com 1 concorrente e 1 reclamacao: 200 com tem_gente.pontos igual a 0', async () => {
+  await comServidor(async ({ base }) => {
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A' }));
+    await postEvidencia(base, evidenciaValida({ tipo: 'reclamacao', fonte: 'Reclamacao X' }));
+
+    const r = await getNota(base);
+
+    assert.equal(r.status, 200);
+    assert.equal(r.corpo.criterios.tem_gente.pontos, 0);
+    assert.equal(r.corpo.criterios.tem_gente.detalhe, '1 concorrente registrado. Minimo: 2.');
+    assert.equal(r.corpo.total, 0);
+
+    // As duas evidências continuam registradas: a nota não consome nem apaga nada.
+    const evidencias = await getEvidencias(base);
+    assert.equal(evidencias.corpo.total, 2);
+  });
+});
+
+test('nenhum teste de /nota grava no evidencias.jsonl de producao', async () => {
+  const antes = lerLinhas(ARQUIVO_EVIDENCIAS).length;
+
+  await comServidor(async ({ base }) => {
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A' }));
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B' }));
+    await getNota(base);
   });
 
   const depois = lerLinhas(ARQUIVO_EVIDENCIAS).length;
