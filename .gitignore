@@ -1,14 +1,17 @@
 node_modules/
 *.jsonl
 .env
-.env.*
+.env.local
+.env.*.local
 *.log
 .DS_Store
 Thumbs.db
 desktop.ini
 body-tmp.json
 *.tmp
+conversas/
+briefing-abertura.md
 
-# The .env.* pattern above would also ignore .env.example, which must be
-# versioned as documentation of the environment variables.
+# O padrão .env.* acima também ignoraria .env.example, que deve ser
+# versionado como documentação das variáveis de ambiente.
 !.env.example
