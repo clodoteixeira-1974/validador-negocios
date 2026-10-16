@@ -1,0 +1,10 @@
+node_modules/
+*.jsonl
+.env
+.env.*
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+body-tmp.json
+*.tmp
