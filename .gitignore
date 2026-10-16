@@ -8,3 +8,7 @@ Thumbs.db
 desktop.ini
 body-tmp.json
 *.tmp
+
+# O padrão .env.* acima também pegaria .env.example, que deve ser versionado
+# como documentação das variáveis de ambiente.
+!.env.example

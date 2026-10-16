@@ -69,7 +69,8 @@ function validarEvidencia(evidencia) {
 }
 
 // Grava uma evidência em evidencias.jsonl (append). Retorna a evidência gravada.
-function registrarEvidencia(evidencia) {
+// O caminho é opcional: os testes automatizados passam um arquivo temporário.
+function registrarEvidencia(evidencia, arquivo = ARQUIVO_EVIDENCIAS) {
   const registro = Object.assign({}, evidencia);
 
   if (registro.id === undefined || registro.id === null || registro.id === '') {
@@ -103,25 +104,26 @@ function registrarEvidencia(evidencia) {
     relevancia: registro.relevancia
   };
 
-  fs.appendFileSync(ARQUIVO_EVIDENCIAS, JSON.stringify(ordem) + '\n', 'utf8');
+  fs.appendFileSync(arquivo, JSON.stringify(ordem) + '\n', 'utf8');
 
   return ordem;
 }
 
 // Lê o arquivo e devolve um array de objetos. Arquivo inexistente = array vazio.
-function listarEvidencias() {
-  if (!fs.existsSync(ARQUIVO_EVIDENCIAS)) {
+// O caminho é opcional e segue a mesma regra de registrarEvidencia.
+function listarEvidencias(arquivo = ARQUIVO_EVIDENCIAS) {
+  if (!fs.existsSync(arquivo)) {
     return [];
   }
 
-  const conteudo = fs.readFileSync(ARQUIVO_EVIDENCIAS, 'utf8');
+  const conteudo = fs.readFileSync(arquivo, 'utf8');
   const linhas = conteudo.split('\n').filter((linha) => linha.trim() !== '');
 
   return linhas.map((linha, indice) => {
     try {
       return JSON.parse(linha);
     } catch (erro) {
-      throw new Error(`Linha ${indice + 1} de evidencias.jsonl não é um JSON válido: ${erro.message}`);
+      throw new Error(`Linha ${indice + 1} de ${path.basename(arquivo)} não é um JSON válido: ${erro.message}`);
     }
   });
 }
