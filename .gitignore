@@ -1,8 +1,7 @@
 node_modules/
 *.jsonl
 .env
-.env.local
-.env.*.local
+.env.*
 *.log
 .DS_Store
 Thumbs.db
@@ -12,6 +11,6 @@ body-tmp.json
 conversas/
 briefing-abertura.md
 
-# O padrão .env.* acima também ignoraria .env.example, que deve ser
-# versionado como documentação das variáveis de ambiente.
+# O padrao .env.* acima tambem ignoraria .env.example, que deve ser
+# versionado como documentacao das variaveis de ambiente.
 !.env.example
