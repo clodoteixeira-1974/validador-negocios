@@ -24,7 +24,8 @@ const PALAVRAS_MOBILE = ['app', 'aplicativo'];
 
 // Campos que o cliente pode enviar em POST /evidencias.
 // id e timestamp nao entram aqui: sao gerados pelo modulo evidencias.js.
-const CAMPOS_EVIDENCIA = ['tipo', 'fonte', 'url', 'trecho_bruto', 'ideia_relacionada', 'relevancia'];
+// id_validacao entra: e o que amarra a evidencia a uma validacao especifica.
+const CAMPOS_EVIDENCIA = ['tipo', 'fonte', 'url', 'trecho_bruto', 'ideia_relacionada', 'relevancia', 'id_validacao'];
 
 // Regra única de classificação
 function classificarTipo(ideia) {
@@ -95,20 +96,10 @@ function buscarValidacao(id, arquivo = ARQUIVO_VALIDACOES) {
   return null;
 }
 
-// Evidências cuja ideia_relacionada bate com o texto da ideia validada. Como o
-// campo é texto livre e não um identificador, a comparação é por substring.
-function evidenciasRelacionadas(ideia, arquivo) {
-  const evidencias = listarEvidencias(arquivo);
-  const alvo = String(ideia).trim().toLowerCase();
-
-  if (alvo === '') {
-    return [];
-  }
-
-  return evidencias.filter((evidencia) => {
-    const relacionada = String(evidencia.ideia_relacionada || '').trim().toLowerCase();
-    return relacionada !== '' && (alvo.includes(relacionada) || relacionada.includes(alvo));
-  });
+// Evidências vinculadas a uma validação específica, pelo campo id_validacao.
+// Sem o id, a evidência é geral e não entra em relatório nenhum.
+function evidenciasDaValidacao(id, arquivo) {
+  return listarEvidencias(arquivo, id);
 }
 
 // Página de erro do relatório: simples de propósito, sem CSS pesado.
@@ -182,9 +173,12 @@ function createApp(opcoes = {}) {
     return res.status(405).json({ error: 'Metodo nao permitido', permitido: 'POST' });
   });
 
-  // Lista as evidencias gravadas
+  // Lista as evidencias gravadas. Com ?id=<id de validacao>, devolve so as
+// evidencias vinculadas a ele e a nota passa a ser por ideia; sem o parametro,
+// devolve todas e a nota e a geral.
   app.get('/evidencias', (req, res) => {
-    const evidencias = listarEvidencias(arquivoEvidencias);
+    const filtro = typeof req.query.id === 'string' ? req.query.id : undefined;
+    const evidencias = listarEvidencias(arquivoEvidencias, filtro);
     return res.json({ total: evidencias.length, evidencias });
   });
 
@@ -206,10 +200,11 @@ function createApp(opcoes = {}) {
     }
   });
 
-  // Calcula a nota a partir das evidencias registradas. Os criterios vem do
-// modulo nota.js. A nota e geral: conta todos os concorrentes e reclamacoes.
+// Calcula a nota a partir das evidencias registradas. Com ?id=<id de validacao>,
+  // a nota e da ideia correspondente; sem o parametro, e a nota geral.
   app.get('/nota', (req, res) => {
-    const evidencias = listarEvidencias(arquivoEvidencias);
+    const filtro = typeof req.query.id === 'string' ? req.query.id : undefined;
+    const evidencias = listarEvidencias(arquivoEvidencias, filtro);
     return res.json(calcularNota(evidencias));
   });
 
@@ -226,11 +221,11 @@ function createApp(opcoes = {}) {
       return res.status(404).type('html').send(paginaNaoEncontrada(String(req.params.id)));
     }
 
-    const nota = calcularNota(listarEvidencias(arquivoEvidencias));
-    const relacionadas = evidenciasRelacionadas(validacao.ideia, arquivoEvidencias);
+    const evidencias = evidenciasDaValidacao(validacao.id, arquivoEvidencias);
+    const nota = calcularNota(evidencias);
     const base = `${req.protocol}://${req.get('host') || ''}`;
 
-    return res.type('html').send(gerarHtmlRelatorio(validacao, nota, relacionadas, base));
+    return res.type('html').send(gerarHtmlRelatorio(validacao, nota, evidencias, base));
   });
 
   // Qualquer outro metodo em /nota: 405 com Allow: GET
@@ -289,7 +284,7 @@ module.exports = {
   registrarValidacao,
   gerarId,
   buscarValidacao,
-  evidenciasRelacionadas,
+  evidenciasDaValidacao,
   ARQUIVO_VALIDACOES,
   ARQUIVO_EVIDENCIAS,
   PORTA_PADRAO,

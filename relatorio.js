@@ -444,7 +444,7 @@ function gerarHtmlDashboard() {
         return;
       }
 
-      var respostaNota = await fetch('/nota');
+      var respostaNota = await fetch('/nota?id=' + encodeURIComponent(validacao.id));
       var nota = await respostaNota.json();
 
       document.getElementById('r-ideia').textContent = validacao.ideia;

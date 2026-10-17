@@ -24,6 +24,10 @@ Cada validação aceita é gravada em um arquivo de registro com a ideia, o tipo
 hora. Cada evidência registrada é gravada em outro arquivo, com a fonte, o trecho
 original, a ideia à qual se refere e o nível de relevância.
 
+Uma evidência pode ser **vinculada a uma validação** pelo campo opcional `id_validacao`,
+que recebe o id devolvido por `POST /validar-ideia`. Com ele, a evidência conta apenas na
+nota daquela ideia; sem ele, ela vale para a nota geral.
+
 As evidências são identificadas e datadas pelo próprio servidor: o cliente não escolhe o
 identificador nem a data, apenas o conteúdo da evidência. Um registro sem os campos
 obrigatórios é recusado com erro, e nada é gravado.
@@ -102,7 +106,7 @@ Para rodar os testes:
 npm test
 ```
 
-São 71 testes automatizados, todos passando.
+São 79 testes automatizados, todos passando.
 
 Dois exemplos de chamada:
 
@@ -126,6 +130,23 @@ curl -X POST http://localhost:3000/evidencias \
 
 # Listar todas as evidências registradas
 curl http://localhost:3000/evidencias
+```
+
+Um exemplo de evidência vinculada a uma validação, que é o que faz a nota ser da ideia:
+
+```bash
+# Primeiro, validar a ideia e copiar o id devolvido
+curl -X POST http://localhost:3000/validar-ideia \
+  -H "Content-Type: application/json" \
+  -d "{\"ideia\":\"App para controlar gastos\"}"
+
+# Depois, registrar a evidência com o id da validação
+curl -X POST http://localhost:3000/evidencias \
+  -H "Content-Type: application/json" \
+  -d "{\"tipo\":\"concorrente\",\"fonte\":\"Google Play\",\"ideia_relacionada\":\"App para controlar gastos\",\"relevancia\":\"alta\",\"id_validacao\":\"1792233527713-obrjge\"}"
+
+# E consultar a nota só daquela ideia
+curl "http://localhost:3000/nota?id=1792233527713-obrjge"
 ```
 
 Um exemplo de evidência de monetização, o tipo que alimenta o critério "alguém paga?":
@@ -162,11 +183,11 @@ curl http://localhost:3000/nota
 | POST   | `/validar-ideia`   | `400` com `{"error": "JSON invalido"}` quando o corpo enviado não é um JSON bem formado              |
 | GET    | `/validar-ideia`   | `405` com o cabeçalho `Allow: POST` — a rota existe, mas não aceita esse método                      |
 | POST   | `/saude`           | `405` com o cabeçalho `Allow: GET`                                                                    |
-| POST   | `/evidencias`      | `201` com a evidência gravada, já com `id` e `timestamp` gerados pelo servidor                          |
+| POST   | `/evidencias`      | `201` com a evidência gravada, já com `id` e `timestamp` gerados pelo servidor. Aceita `id_validacao` opcional, que vincula a evidência a uma ideia |
 | POST   | `/evidencias`      | `400` com `{"error": "..."}` quando falta um campo obrigatório, ou o `tipo` ou a `relevancia` não valem   |
-| GET    | `/evidencias`      | `200` com `{"total": N, "evidencias": [...]}`; com nada registrado, `{"total": 0, "evidencias": []}`     |
+| GET    | `/evidencias`      | `200` com `{"total": N, "evidencias": [...]}`. Com `?id=<id de validação>`, devolve só as evidências vinculadas a ela |
 | outro  | `/evidencias`      | `405` com o cabeçalho `Allow: GET, POST` — a rota não aceita esse método                                  |
-| GET    | `/nota`            | `200` com `{"criterios": {...}, "total": N, "maximo_possivel": N}` — a nota a partir das evidências     |
+| GET    | `/nota`            | `200` com `{"criterios", "total", "maximo_possivel", "veredito"}`. Com `?id=<id>`, a nota é só da ideia; sem ele, é a nota geral |
 | outro  | `/nota`            | `405` com o cabeçalho `Allow: GET` — a rota não aceita esse método                                     |
 | GET    | `/dashboard`       | `200` com a página HTML do dashboard: formulário, resultado e botão de copiar link                    |
 | GET    | `/relatorio/:id`   | `200` com o relatório em HTML da validação de id, em folha A4                                          |
@@ -227,9 +248,9 @@ decisão, e é descrito na seção seguinte.
 | Arquivo                             | Função                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `server.js`                         | O serviço. Recebe requisições, valida, classifica, grava e devolve as respostas.                         |
-| `server.test.js`                    | 37 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
+| `server.test.js`                    | 41 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
 | `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações, dados de mercado, monetização e alcance. |
-| `evidencias.test.js`                | 11 testes do módulo de evidências, também com arquivos temporários.                                      |
+| `evidencias.test.js`                | 15 testes do módulo de evidências, também com arquivos temporários.                                      |
 | `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua e deriva o veredito.                           |
 | `nota.test.js`                      | 23 testes do cálculo da nota e do veredito, sem HTTP e sem disco.                                          |
 | `relatorio.js`                      | Gera o HTML do relatório A4 e do dashboard, com o CSS embutido.                                            |
@@ -250,19 +271,18 @@ nativo do Node.js.
 ## Estado do projeto
 
 Fase avançada: o serviço de validação e classificação está funcionando, a régua está
-completa com os cinco critérios, cada nota vem com um veredito, e há um dashboard em HTML
-que gera um relatório A4 com link para compartilhar. São 71 testes automatizados, todos
-passando.
+completa com os cinco critérios, cada nota vem com um veredito, e a nota é **por ideia**:
+as evidências se vinculam ao identificador da validação, e o relatório mostra a nota
+correta daquela ideia. Há um dashboard em HTML que gera um relatório A4 com link para
+compartilhar. São 79 testes automatizados, todos passando.
 
-O que ainda falta: coletar concorrentes e reclamações de verdade, publicar o serviço, e
-ligar a nota a uma ideia específica.
+O que ainda falta: coletar concorrentes e reclamações de verdade, e publicar o serviço.
 
 ## Próximos passos
 
 - Coletar concorrentes reais e extrair reclamações de usuários
 - Publicar o serviço e o dashboard
-- Dar um identificador de validação e fazer a nota ser por ideia
-- Relatório com mais de uma validação
+- Ligar a coleta de evidências ao id da validação automaticamente
 
 O detalhamento do que falta, das decisões já tomadas e do próximo passo imediato está em
 `ESTADO.md`.

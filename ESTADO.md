@@ -36,8 +36,16 @@ dados de verdade e o relatório final ainda não existem.
 
 - Endpoint `POST /validar-ideia`
 - Endpoints `POST /evidencias` e `GET /evidencias` (integrados ao `server.js`)
+- Cada evidência pode ser **vinculada a uma validação** pelo campo opcional
+  `id_validacao`. Com o vínculo, a nota passa a ser por ideia; sem ele, a evidência segue
+  valendo para a nota geral
+- `GET /nota?id=<id>` e `GET /evidencias?id=<id>` filtram por validação. Sem o parâmetro,
+  ambos continuam devolvendo tudo, e a nota é a geral
+- `GET /relatorio/:id` calcula a nota **só com as evidências vinculadas àquele id**. A
+  heurística anterior, que associava evidências por comparação do texto da ideia, foi
+  removida por ser frágil
 - Endpoint `GET /dashboard`: página HTML com formulário de ideia, resultado e botão de
-  copiar o link do relatório
+  copiar o link do relatório. O painel consulta a nota da ideia, com `?id=`
 - Endpoint `GET /relatorio/:id`: relatório HTML em folha A4, com a ideia, a data, a nota, o
   veredito, os cinco critérios e as evidências relacionadas. Sem JavaScript
 - Cada validação recebe um `id` (timestamp + aleatório), devolvido na resposta de
@@ -61,7 +69,7 @@ dados de verdade e o relatório final ainda não existem.
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 71 testes automatizados (37 em `server.test.js` + 11 em `evidencias.test.js` + 23 em
+- 79 testes automatizados (41 em `server.test.js` + 15 em `evidencias.test.js` + 23 em
   `nota.test.js`)
 
 ## O que não existe ainda
@@ -70,7 +78,7 @@ Alinhado ao fluxograma do projeto:
 
 - Coleta real de concorrentes
 - Extração de reclamações
-- Nota por ideia (hoje é geral)
+- Vínculo automático entre uma ideia e suas evidências na hora de coletar
 - Integração com LLM
 - RAG
 - Frontend
@@ -106,7 +114,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 
 - Servidor: não está rodando. Para iniciar: `npm start`
 - Porta padrão: 3000 (configurável via `PORT`)
-- Testes: `npm test` (71 passando)
+- Testes: `npm test` (79 passando)
 - Repositório GitHub: https://github.com/clodoteixeira-1974/validador-negocios
 - Branch principal: `main`
 
@@ -115,7 +123,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 71 testes automatizados
+npm test        # roda os 79 testes automatizados
 ```
 
 Exemplos de chamada:
@@ -141,22 +149,18 @@ Para usar outra porta: `PORT=8080 npm start` (Linux/macOS) ou
 
 ## Próximo passo
 
-**Tarefa 21 — coletar concorrentes e reclamações de verdade**. O produto está completo do
-lado do cálculo e da entrega: existe régua, veredito, dashboard e relatório. O que falta é o
-dado real, hoje tudo o que está em `validacoes.jsonl` e `evidencias.jsonl` é fictício e
-montado à mão.
+**Tarefa 22 — coletar concorrentes e reclamações de verdade**. A nota agora é por ideia, e
+isso muda o que a próxima tarefa precisa decidir. A coleta não pode mais ser solta: cada
+evidência coletada precisa saber a qual validação pertence, senão ela cai na nota geral e
+não aparece em relatório nenhum. Ou seja, o coletor precisa do `id` da ideia como entrada.
 
-Esta é a primeira tarefa do projeto que vai depender de fonte externa, e aí aparecem
-decisões que nenhuma tarefa anterior teve que tomar: de onde vêm os dados, com que
-frequência se busca, se o coletor está proibido de fazer requisições aos sites consultados, e
-como um texto coletado vira evidência validada. A boa notícia é que o destino já existe:
-   `POST /evidencias` aceita qualquer fonte, e `validarEvidencia` já garante a forma do
-   registro.
+As perguntas para o PO são de produto e de conduta, não de código: de onde vêm os dados, com
+que frequência se busca, se o coletor está proibido de fazer requisições aos sites
+consultados, e se a pessoa valida a evidência coletada antes de entrar no relatório. O
+destino já existe: `POST /evidencias` aceita `id_validacao`, e `validarEvidencia` já
+recusa registro malformado.
 
 ## Pendências conhecidas
-
-Nada foi adiado nesta tarefa. As pendências sobre o 405 de `/nota` e de `/evidencias` foram
-resolvidas no fix-01.
 
 Permanecem em aberto, todas de ambiente ou de infraestrutura, nenhuma de código:
 
@@ -167,13 +171,16 @@ Permanecem em aberto, todas de ambiente ou de infraestrutura, nenhuma de código
   máquina local. Falta o script para rodar via `cron` na VPS.
 - **Sem `.env`**: quando a integração com LLM acontecer, faltará o arquivo de variáveis de
   ambiente e o `.env.example`. O `.gitignore` já está preparado para versionar o exemplo.
-- **Nota é geral, sem vínculo com uma ideia**: os cinco critérios contam evidências de
-  todas as ideias juntas, porque `ideia_relacionada` é texto livre. **Esta tarefa deu um
-  identificador a cada validação**, que é o primeiro passo para resolver isso: o relatório
-  agora sabe de qual validação fala. O que falta é fazer a nota e as evidências se
-  vincularem a esse identificador em vez de comparar texto. No relatório, as evidências são
-  associadas por substring do texto da ideia, o que é frágil e está registrado aqui como
-  limite conhecido.
+- **Nota por ideia depende de o cliente enviar `id_validacao`**: o vínculo existe e é o
+  que corrige o relatório, mas nada o preenche sozinho. Quem integra o serviço precisa
+  validar a ideia, guardar o id devolvido e repassá-lo em cada evidência. Evidências sem
+  vínculo continuam existindo e contando na nota geral, o que é útil para material que não
+  pertence a uma ideia específica, mas significa que **um relatório só mostra o que foi
+  vinculado a ele**.
+- **Evidências já gravadas não têm vínculo.** Os registros anteriores a esta tarefa
+  continuam sem `id_validacao` e, por isso, não aparecem em relatório nenhum. Como os
+  arquivos `.jsonl` são ignorados pelo Git, isso não afeta quem clonar o repositório: a
+  correção só vale para os dados gravados a partir daqui.
 - **Link de compartilhamento sem controle de acesso**: qualquer pessoa com o link abre o
   relatório. Não há autenticação nem segredo na URL. Se o relatório passar a conter dado
   sensível, isso precisa ser resolvido antes.

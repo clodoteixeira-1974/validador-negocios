@@ -283,3 +283,85 @@ test('os 5 tipos convivem na mesma gravacao, na ordem em que foram gravados', as
     );
   });
 });
+
+test('evidência com id_validacao é gravada e recuperada', async () => {
+  await comArquivo(async (arquivo) => {
+    const gravada = registrarEvidencia(definicaoValida({ id_validacao: 'val-abc' }), arquivo);
+
+    assert.equal(gravada.id_validacao, 'val-abc');
+    assert.equal(JSON.parse(lerLinhas(arquivo)[0]).id_validacao, 'val-abc');
+
+    const listadas = listarEvidencias(arquivo);
+    assert.equal(listadas[0].id_validacao, 'val-abc');
+    assert.deepEqual(validarEvidencia(gravada), []);
+  });
+});
+
+test('id_validacao ausente não é gravado, e id_validacao vazio é recusado', async () => {
+  await comArquivo(async (arquivo) => {
+    const semVinculo = registrarEvidencia(definicaoValida(), arquivo);
+
+    assert.equal('id_validacao' in semVinculo, false);
+    assert.equal('id_validacao' in JSON.parse(lerLinhas(arquivo)[0]), false);
+
+    // Vazio não é o mesmo que ausente: um id vazio pareceria vinculado.
+    assert.throws(
+      () => registrarEvidencia(definicaoValida({ id_validacao: '   ' }), arquivo),
+      /não pode ser vazio/
+    );
+
+    // E o tipo errado é recusado.
+    assert.throws(
+      () => registrarEvidencia(definicaoValida({ id_validacao: 123 }), arquivo),
+      /deve ser string/
+    );
+
+    assert.equal(contagemLinhas(arquivo), 1);
+  });
+});
+
+test('listarEvidencias com filtro devolve só as evidencias daquele id_validacao', async () => {
+  await comArquivo(async (arquivo) => {
+    registrarEvidencia(definicaoValida({ fonte: 'A1', id_validacao: 'val-1' }), arquivo);
+    registrarEvidencia(definicaoValida({ fonte: 'B1', id_validacao: 'val-2' }), arquivo);
+    registrarEvidencia(definicaoValida({ fonte: 'A2', id_validacao: 'val-1' }), arquivo);
+    registrarEvidencia(definicaoValida({ fonte: 'Solto' }), arquivo);
+
+    const daVal1 = listarEvidencias(arquivo, 'val-1');
+    const daVal2 = listarEvidencias(arquivo, 'val-2');
+    const deNinguem = listarEvidencias(arquivo, 'val-inexistente');
+
+    assert.equal(daVal1.length, 2);
+    assert.deepEqual(daVal1.map((evidencia) => evidencia.fonte), ['A1', 'A2']);
+
+    assert.equal(daVal2.length, 1);
+    assert.equal(daVal2[0].fonte, 'B1');
+
+    // Id sem evidencias não devolve nada, e não devolve todas.
+    assert.deepEqual(deNinguem, []);
+
+    // Filtro vazio é ignorado: devolve todas, como não filtrar.
+    assert.equal(listarEvidencias(arquivo, '').length, 4);
+    assert.equal(listarEvidencias(arquivo, undefined).length, 4);
+    assert.equal(listarEvidencias(arquivo, null).length, 4);
+  });
+});
+
+test('listarEvidencias sem filtro devolve todas, na ordem de gravação', async () => {
+  await comArquivo(async (arquivo) => {
+    registrarEvidencia(definicaoValida({ fonte: 'A', id_validacao: 'val-1' }), arquivo);
+    registrarEvidencia(definicaoValida({ fonte: 'B', id_validacao: 'val-2' }), arquivo);
+    registrarEvidencia(definicaoValida({ fonte: 'C' }), arquivo);
+
+    const todas = listarEvidencias(arquivo);
+
+    assert.equal(todas.length, 3);
+    assert.deepEqual(
+      todas.map((evidencia) => evidencia.fonte),
+      ['A', 'B', 'C']
+    );
+
+    // E o arquivo continua com as tres linhas: filtrar não apaga nada.
+    assert.equal(contagemLinhas(arquivo), 3);
+  });
+});

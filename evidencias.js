@@ -22,6 +22,11 @@ const CAMPOS_OBRIGATORIOS = [
   'relevancia'
 ];
 
+// Campos aceitos, porém opcionais. "id_validacao" amarra a evidência a uma
+// validação específica: sem ele a evidência é geral, com ele a evidência
+// responde por um único id e é assim que a nota passa a ser por ideia.
+const CAMPOS_OPCIONAIS = ['id_validacao'];
+
 // Gera um id único: timestamp em ms + sufixo aleatório
 function gerarId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -65,6 +70,22 @@ function validarEvidencia(evidencia) {
     erros.push(`campo "url" deve ser string (pode ser vazia), recebido ${typeof evidencia.url}`);
   }
 
+  // Campos opcionais: só são validados quando presentes.
+  for (const campo of CAMPOS_OPCIONAIS) {
+    if (evidencia[campo] === undefined) {
+      continue;
+    }
+
+    if (typeof evidencia[campo] !== 'string') {
+      erros.push(`campo opcional "${campo}" deve ser string, recebido ${typeof evidencia[campo]}`);
+      continue;
+    }
+
+    if (evidencia[campo].trim() === '') {
+      erros.push(`campo opcional "${campo}" não pode ser vazio: apague o campo para deixar de ser vinculado`);
+    }
+  }
+
   return erros;
 }
 
@@ -83,6 +104,13 @@ function registrarEvidencia(evidencia, arquivo = ARQUIVO_EVIDENCIAS) {
 
   if (registro.url === undefined || registro.url === null) {
     registro.url = '';
+  }
+
+  // Vínculo com a validação: some quando não informado. Ausente é diferente de
+  // vazio: um id em branco é recusado pela validação, porque pareceria vinculado
+  // a uma validação que não existe.
+  if (registro.id_validacao === undefined || registro.id_validacao === null) {
+    delete registro.id_validacao;
   }
 
   const erros = validarEvidencia(registro);
@@ -104,14 +132,21 @@ function registrarEvidencia(evidencia, arquivo = ARQUIVO_EVIDENCIAS) {
     relevancia: registro.relevancia
   };
 
+  // O vínculo vem por último para não mudar a ordem dos campos já gravados.
+  if (registro.id_validacao !== undefined) {
+    ordem.id_validacao = registro.id_validacao;
+  }
+
   fs.appendFileSync(arquivo, JSON.stringify(ordem) + '\n', 'utf8');
 
   return ordem;
 }
 
 // Lê o arquivo e devolve um array de objetos. Arquivo inexistente = array vazio.
+// Com idValidacao informado, devolve só as evidências vinculadas a ele; sem o
+// parâmetro, devolve todas.
 // O caminho é opcional e segue a mesma regra de registrarEvidencia.
-function listarEvidencias(arquivo = ARQUIVO_EVIDENCIAS) {
+function listarEvidencias(arquivo = ARQUIVO_EVIDENCIAS, idValidacao) {
   if (!fs.existsSync(arquivo)) {
     return [];
   }
@@ -119,13 +154,19 @@ function listarEvidencias(arquivo = ARQUIVO_EVIDENCIAS) {
   const conteudo = fs.readFileSync(arquivo, 'utf8');
   const linhas = conteudo.split('\n').filter((linha) => linha.trim() !== '');
 
-  return linhas.map((linha, indice) => {
+  const registros = linhas.map((linha, indice) => {
     try {
       return JSON.parse(linha);
     } catch (erro) {
       throw new Error(`Linha ${indice + 1} de ${path.basename(arquivo)} não é um JSON válido: ${erro.message}`);
     }
   });
+
+  if (typeof idValidacao !== 'string' || idValidacao.trim() === '') {
+    return registros;
+  }
+
+  return registros.filter((registro) => registro && registro.id_validacao === idValidacao);
 }
 
 module.exports = {
@@ -135,6 +176,7 @@ module.exports = {
   gerarId,
   ARQUIVO_EVIDENCIAS,
   CAMPOS_OBRIGATORIOS,
+  CAMPOS_OPCIONAIS,
   TIPOS,
   RELEVANCIAS
 };

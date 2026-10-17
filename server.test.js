@@ -674,11 +674,12 @@ test('POST /validar-ideia: a resposta inclui o id que dá acesso ao relatório',
 
 test('GET /relatorio/:id com id válido: 200 com HTML do relatório', async () => {
   await comServidor(async ({ base, arquivo }) => {
-    // Valida uma ideia e registra evidências relacionadas a ela.
+    // Valida uma ideia e registra uma evidência vinculada a ela.
     const validacao = await post(base, { ideia: 'App para controlar gastos' });
     await postEvidencia(base, evidenciaValida({
       fonte: 'Concorrente A',
-      ideia_relacionada: 'App para controlar gastos'
+      ideia_relacionada: 'App para controlar gastos',
+      id_validacao: validacao.corpo.id
     }));
 
     const resposta = await fetch(`${base}/relatorio/${validacao.corpo.id}`);
@@ -772,6 +773,132 @@ test('o HTML do relatório traz @page A4 e @media print escondendo os controles'
     // E nenhum recurso externo: o CSS é embutido.
     assert.ok(!corpo.includes('<link '), 'nenhum CSS externo');
     assert.ok(!/<script/i.test(corpo), 'relatório não deve ter JavaScript');
+  });
+});
+
+test('POST /evidencias com id_validacao é aceito e vincula a evidência', async () => {
+  await comServidor(async ({ base, arquivoEvidencias }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+
+    const r = await postEvidencia(base, evidenciaValida({
+      fonte: 'Concorrente A',
+      ideia_relacionada: 'App para controlar gastos',
+      id_validacao: validacao.corpo.id
+    }));
+
+    assert.equal(r.status, 201);
+    assert.equal(r.corpo.id_validacao, validacao.corpo.id);
+
+    // O vínculo foi gravado no arquivo temporário.
+    const gravada = JSON.parse(lerLinhas(arquivoEvidencias)[0]);
+    assert.equal(gravada.id_validacao, validacao.corpo.id);
+  });
+});
+
+test('GET /nota?id= calcula a nota so com as evidencias daquele id', async () => {
+  await comServidor(async ({ base }) => {
+    // Duas validações distintas, cada uma com suas evidências.
+    const ideiaA = await post(base, { ideia: 'App para controlar gastos' });
+    const ideiaB = await post(base, { ideia: 'Consultoria de marketing' });
+
+    // A tem um concorrente: não atinge o mínimo de 2.
+    await postEvidencia(base, evidenciaValida({
+      fonte: 'Concorrente A1',
+      id_validacao: ideiaA.corpo.id
+    }));
+
+    // B tem dois concorrentes e uma reclamação: pontua tem_gente, insatisfeita e cabe_mais_um.
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B1', id_validacao: ideiaB.corpo.id }));
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B2', id_validacao: ideiaB.corpo.id }));
+    await postEvidencia(base, evidenciaValida({
+      tipo: 'reclamacao',
+      fonte: 'Reclamacao B',
+      id_validacao: ideiaB.corpo.id
+    }));
+
+    const resposta = await fetch(`${base}/nota?id=${encodeURIComponent(ideiaA.corpo.id)}`);
+    const nota = await resposta.json();
+
+    // A nota de A é 0: o único concorrente dele não pontua.
+    assert.equal(resposta.status, 200);
+    assert.equal(nota.total, 0);
+    assert.equal(nota.criterios.tem_gente.pontos, 0);
+    assert.equal(nota.criterios.tem_gente_insatisfeita.pontos, 0);
+    assert.equal(nota.criterios.cabe_mais_um.pontos, 0);
+    assert.equal(nota.veredito.decisao, 'PARAR');
+
+    // A de B é 3: as evidências de A não contam para B nem o contrário.
+    const respostaB = await fetch(`${base}/nota?id=${encodeURIComponent(ideiaB.corpo.id)}`);
+    const notaB = await respostaB.json();
+
+    assert.equal(notaB.total, 3);
+    assert.equal(notaB.criterios.tem_gente.pontos, 1);
+    assert.equal(notaB.criterios.tem_gente_insatisfeita.pontos, 1);
+    assert.equal(notaB.criterios.cabe_mais_um.pontos, 1);
+    assert.equal(notaB.veredito.decisao, 'MUDAR_O_RECORTE');
+    assert.equal(notaB.maximo_possivel, 5);
+  });
+});
+
+test('GET /nota sem ?id= mantém a nota global, sobre todas as evidencias', async () => {
+  await comServidor(async ({ base }) => {
+    const ideiaA = await post(base, { ideia: 'App para controlar gastos' });
+    const ideiaB = await post(base, { ideia: 'Consultoria de marketing' });
+
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A1', id_validacao: ideiaA.corpo.id }));
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B1', id_validacao: ideiaB.corpo.id }));
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B2', id_validacao: ideiaB.corpo.id }));
+    await postEvidencia(base, evidenciaValida({
+      tipo: 'reclamacao',
+      fonte: 'Reclamacao B',
+      id_validacao: ideiaB.corpo.id
+    }));
+
+    const resposta = await fetch(`${base}/nota`);
+    const nota = await resposta.json();
+
+    // Sem filtro, a nota soma as duas validações: 3 concorrentes + 1 reclamação.
+    // Os 3 concorrentes estão na faixa de "cabe mais um?", então valem 1 ponto.
+    assert.equal(resposta.status, 200);
+    assert.equal(nota.total, 3);
+    assert.equal(nota.criterios.tem_gente.pontos, 1);
+    assert.equal(nota.criterios.cabe_mais_um.pontos, 1);
+    assert.equal(nota.criterios.tem_gente_insatisfeita.pontos, 1);
+  });
+});
+
+test('GET /relatorio/:id mostra a nota daquela validacao, e nao a global', async () => {
+  await comServidor(async ({ base }) => {
+    // A ideia A é fraca: um concorrente, que não pontua.
+    const ideiaA = await post(base, { ideia: 'App para controlar gastos' });
+    await postEvidencia(base, evidenciaValida({
+      fonte: 'Concorrente A1',
+      id_validacao: ideiaA.corpo.id
+    }));
+
+    // A ideia B é forte: duas concorrentes e uma reclamação. Sem vínculo com A.
+    const ideiaB = await post(base, { ideia: 'Consultoria de marketing' });
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B1', id_validacao: ideiaB.corpo.id }));
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B2', id_validacao: ideiaB.corpo.id }));
+    await postEvidencia(base, evidenciaValida({
+      tipo: 'reclamacao',
+      fonte: 'Reclamacao B',
+      id_validacao: ideiaB.corpo.id
+    }));
+
+    // O relatório de A não pode herdar a nota de B.
+    const relatorioA = await (await fetch(`${base}/relatorio/${ideiaA.corpo.id}`)).text();
+    assert.match(relatorioA, /nota-grande">0</);
+    assert.match(relatorioA, /PARAR/);
+    assert.ok(relatorioA.includes('Concorrente A1'));
+    assert.ok(!relatorioA.includes('Concorrente B1'), 'nao deve trazer evidencias de outra ideia');
+
+    // O relatório de B mostra a nota dele.
+    const relatorioB = await (await fetch(`${base}/relatorio/${ideiaB.corpo.id}`)).text();
+    assert.match(relatorioB, /nota-grande">3</);
+    assert.match(relatorioB, /MUDAR_O_RECORTE/);
+    assert.ok(relatorioB.includes('Concorrente B1'));
+    assert.ok(!relatorioB.includes('Concorrente A1'), 'nao deve trazer evidencias de outra ideia');
   });
 });
 
