@@ -108,13 +108,30 @@ test('ideia mobile: 200 com tipo "mobile" e gravacao no arquivo temporario', asy
     assert.equal(r.corpo.tipo, 'mobile');
     assert.match(r.corpo.timestamp, /^\d{4}-\d{2}-\d{2}T/);
 
+    // A resposta traz o id gerado, que é o que dá acesso ao relatório.
+    assert.notEqual(r.corpo.id, '');
+    assert.match(r.corpo.id, /^\d+-[a-z0-9]+$/);
+
     const linhas = lerLinhas(arquivo);
     assert.equal(linhas.length, 1);
-    assert.deepEqual(JSON.parse(linhas[0]), {
-      ideia: 'App para controlar gastos',
-      tipo: 'mobile',
-      timestamp: r.corpo.timestamp
-    });
+
+    const gravado = JSON.parse(linhas[0]);
+    assert.notEqual(gravado.id, '');
+    assert.match(gravado.id, /^\d+-[a-z0-9]+$/);
+    assert.equal(gravado.id, r.corpo.id);
+
+    assert.deepEqual(
+      {
+        ideia: gravado.ideia,
+        tipo: gravado.tipo,
+        timestamp: gravado.timestamp
+      },
+      {
+        ideia: 'App para controlar gastos',
+        tipo: 'mobile',
+        timestamp: r.corpo.timestamp
+      }
+    );
   });
 });
 
@@ -631,6 +648,130 @@ test('GET /nota com 1 reclamacao e sem concorrentes: total 1 e veredito PARAR', 
     // Um único sinal não basta para seguir.
     assert.equal(r.corpo.veredito.decisao, 'PARAR');
     assert.equal(r.corpo.veredito.faixa, '0 a 1');
+  });
+});
+
+test('POST /validar-ideia: a resposta inclui o id que dá acesso ao relatório', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    const primeira = await post(base, { ideia: 'App para controlar gastos' });
+    const segunda = await post(base, { ideia: 'Consultoria de marketing' });
+
+    for (const r of [primeira, segunda]) {
+      assert.equal(r.status, 200);
+      assert.equal(r.corpo.recebido, true);
+      assert.equal(typeof r.corpo.id, 'string');
+      assert.match(r.corpo.id, /^\d+-[a-z0-9]+$/);
+    }
+
+    // Cada validação recebe um id próprio.
+    assert.notEqual(primeira.corpo.id, segunda.corpo.id);
+
+    // E os dois ids estão gravados no arquivo temporário.
+    const ids = lerLinhas(arquivo).map((linha) => JSON.parse(linha).id);
+    assert.deepEqual(ids, [primeira.corpo.id, segunda.corpo.id]);
+  });
+});
+
+test('GET /relatorio/:id com id válido: 200 com HTML do relatório', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    // Valida uma ideia e registra evidências relacionadas a ela.
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+    await postEvidencia(base, evidenciaValida({
+      fonte: 'Concorrente A',
+      ideia_relacionada: 'App para controlar gastos'
+    }));
+
+    const resposta = await fetch(`${base}/relatorio/${validacao.corpo.id}`);
+    const corpo = await resposta.text();
+
+    assert.equal(resposta.status, 200);
+    assert.match(resposta.headers.get('content-type') || '', /text\/html/);
+
+    // Cabeçalho, ideia e metadados da validação.
+    assert.match(corpo, /Validador de Novos Negócios/);
+    assert.match(corpo, /App para controlar gastos/);
+    assert.match(corpo, /mobile/);
+    assert.ok(corpo.includes(validacao.corpo.id));
+
+    // Nota e veredito.
+    assert.match(corpo, /de<\/span>|de\s*5 pontos|5 pontos/);
+    assert.ok(/PARAR|MUDAR_O_RECORTE|SEGUIR/.test(corpo));
+
+    // Detalhamento dos cinco critérios.
+    for (const criterio of ['tem_gente', 'tem_gente_insatisfeita', 'cabe_mais_um', 'alguem_paga', 'alcance']) {
+      assert.ok(corpo.includes(criterio), criterio);
+    }
+
+    // A evidência relacionada aparece no relatório.
+    assert.match(corpo, /Concorrente A/);
+
+    // Rodapé com o link para o dashboard.
+    assert.match(corpo, /\/dashboard/);
+  });
+});
+
+test('GET /relatorio/:id com id inválido: 404 com HTML', async () => {
+  await comServidor(async ({ base }) => {
+    const resposta = await fetch(`${base}/relatorio/nao-existe-12345`);
+    const corpo = await resposta.text();
+
+    assert.equal(resposta.status, 404);
+    assert.match(resposta.headers.get('content-type') || '', /text\/html/);
+    assert.match(corpo, /não encontrado/i);
+    assert.match(corpo, /\/dashboard/);
+  });
+});
+
+test('GET /dashboard: 200 com HTML, formulário e botão de copiar', async () => {
+  await comServidor(async ({ base }) => {
+    const resposta = await fetch(`${base}/dashboard`);
+    const corpo = await resposta.text();
+
+    assert.equal(resposta.status, 200);
+    assert.match(resposta.headers.get('content-type') || '', /text\/html/);
+
+    // Formulário para enviar a ideia.
+    assert.match(corpo, /<textarea/);
+    assert.match(corpo, /id="ideia"/);
+    assert.match(corpo, /Validar ideia/);
+
+    // Área de resultado com nota e veredito.
+    assert.match(corpo, /id="r-nota"/);
+    assert.match(corpo, /id="r-veredito"/);
+
+    // Botão de copiar o link do relatório.
+    assert.match(corpo, /Copiar link do relatório/);
+
+    // O JavaScript fala com as rotas da API.
+    assert.match(corpo, /\/validar-ideia/);
+    assert.match(corpo, /\/nota/);
+    assert.match(corpo, /\/relatorio\//);
+
+    // O dashboard não carrega nada de fora.
+    assert.ok(!corpo.includes('http://'), 'nenhuma URL absoluta');
+    assert.ok(!corpo.includes('https://'), 'nenhuma URL absoluta');
+  });
+});
+
+test('o HTML do relatório traz @page A4 e @media print escondendo os controles', async () => {
+  await comServidor(async ({ base }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+
+    const resposta = await fetch(`${base}/relatorio/${validacao.corpo.id}`);
+    const corpo = await resposta.text();
+
+    // Página A4 com margem de 2cm.
+    assert.match(corpo, /@page/);
+    assert.match(corpo, /size:\s*A4/);
+    assert.match(corpo, /margin:\s*2cm/);
+
+    // Regras de impressão que escondem botões e painéis.
+    assert.match(corpo, /@media print/);
+    assert.match(corpo, /button/);
+
+    // E nenhum recurso externo: o CSS é embutido.
+    assert.ok(!corpo.includes('<link '), 'nenhum CSS externo');
+    assert.ok(!/<script/i.test(corpo), 'relatório não deve ter JavaScript');
   });
 });
 

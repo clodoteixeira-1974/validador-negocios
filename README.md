@@ -58,6 +58,21 @@ A nota vai de 0 a 5 e é traduzida em uma decisão, com faixas conservadoras:
 As faixas são deliberadamente conservadoras: com 5 pontos de máximo, só "SEGUIR" exige
 quase tudo certo, e um único sinal isolado ainda leva a `PARAR`.
 
+## O dashboard e o link de compartilhamento
+
+O relatório é uma página HTML feita para A4. Não há PDF gerado no servidor: o usuário abre
+o link, lê na tela e, se quiser o arquivo, usa "Salvar como PDF" do próprio navegador. Essa
+escolha mantém o projeto com uma única dependência.
+
+- **`/dashboard`** — formulário para enviar a ideia, resultado na tela e botão para copiar o
+  link do relatório.
+- **`/relatorio/:id`** — relatório daquela validação, com a ideia, a data, a nota, o
+  veredito, o detalhamento dos cinco critérios e as evidências relacionadas.
+
+O CSS é embutido nas duas páginas e não carrega fonte, imagem ou biblioteca externa. A
+folha está dimensionada para A4 com margem de 2 cm, e as regras de impressão escondem botões
+e painéis, de modo que "Imprimir" sai limpo.
+
 O projeto foi construído em etapas pequenas, cada uma com testes automatizados e um
 relatório em `relatorios/` explicando o que foi feito e por quê.
 
@@ -70,7 +85,11 @@ npm install
 npm start
 ```
 
-O servidor sobe em `http://localhost:3000`. Para usar outra porta:
+O servidor sobe em `http://localhost:3000`. **Para usar o produto, abra
+`http://localhost:3000/dashboard`**: tem um formulário para enviar a ideia, mostra a nota e
+o veredito, e dá o link do relatório para compartilhar.
+
+Para usar outra porta:
 
 ```bash
 PORT=8080 npm start          # Linux/macOS
@@ -83,7 +102,7 @@ Para rodar os testes:
 npm test
 ```
 
-São 66 testes automatizados, todos passando.
+São 71 testes automatizados, todos passando.
 
 Dois exemplos de chamada:
 
@@ -137,7 +156,7 @@ curl http://localhost:3000/nota
 | Método | Rota               | Resposta                                                                                             |
 | ------ | ------------------ | --------------------------------------------------------------------------------------------------- |
 | GET    | `/saude`           | `200` com `{"ok": true, "servico": "validador-negocios"}` — verificação de que o serviço está no ar   |
-| POST   | `/validar-ideia`   | `200` com `recebido`, `ideia`, `tipo` e `timestamp` quando a ideia é válida                         |
+| POST   | `/validar-ideia`   | `200` com `recebido`, `id`, `ideia`, `tipo` e `timestamp` quando a ideia é válida. O `id` dá acesso ao relatório |
 | POST   | `/validar-ideia`   | `400` com `{"error": "..."}` quando o campo `ideia` falta, está vazio ou não é texto                 |
 | POST   | `/validar-ideia`   | `413` quando o corpo do pedido passa de 100 KB                                                       |
 | POST   | `/validar-ideia`   | `400` com `{"error": "JSON invalido"}` quando o corpo enviado não é um JSON bem formado              |
@@ -149,6 +168,9 @@ curl http://localhost:3000/nota
 | outro  | `/evidencias`      | `405` com o cabeçalho `Allow: GET, POST` — a rota não aceita esse método                                  |
 | GET    | `/nota`            | `200` com `{"criterios": {...}, "total": N, "maximo_possivel": N}` — a nota a partir das evidências     |
 | outro  | `/nota`            | `405` com o cabeçalho `Allow: GET` — a rota não aceita esse método                                     |
+| GET    | `/dashboard`       | `200` com a página HTML do dashboard: formulário, resultado e botão de copiar link                    |
+| GET    | `/relatorio/:id`   | `200` com o relatório em HTML da validação de id, em folha A4                                          |
+| GET    | `/relatorio/:id`   | `404` em HTML quando não existe validação com esse id                                                   |
 | GET    | qualquer outra     | `404` com `{"error": "Rota nao encontrada", "caminho": "..."}`                                         |
 
 O corpo da resposta é sempre JSON, inclusive nos casos de erro.
@@ -205,11 +227,12 @@ decisão, e é descrito na seção seguinte.
 | Arquivo                             | Função                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `server.js`                         | O serviço. Recebe requisições, valida, classifica, grava e devolve as respostas.                         |
-| `server.test.js`                    | 32 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
+| `server.test.js`                    | 37 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
 | `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações, dados de mercado, monetização e alcance. |
 | `evidencias.test.js`                | 11 testes do módulo de evidências, também com arquivos temporários.                                      |
 | `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua e deriva o veredito.                           |
 | `nota.test.js`                      | 23 testes do cálculo da nota e do veredito, sem HTTP e sem disco.                                          |
+| `relatorio.js`                      | Gera o HTML do relatório A4 e do dashboard, com o CSS embutido.                                            |
 | `testar-evidencias.js`              | Script de verificação manual do módulo de evidências.                                                     |
 | `package.json`                      | Nome do projeto e os comandos `start` e `test`.                                                          |
 | `validacoes.jsonl`                  | Registro das validações recebidas (gerado em execução, não versionado).                                  |
@@ -226,23 +249,20 @@ nativo do Node.js.
 
 ## Estado do projeto
 
-Fase avançada: o serviço de validação e classificação está funcionando, as rotas de
-evidências estão integradas ao servidor, a régua está completa com os cinco critérios, e
-cada nota vem com um veredito que traduz a pontuação em decisão. São 66 testes automatizados,
-todos passando.
+Fase avançada: o serviço de validação e classificação está funcionando, a régua está
+completa com os cinco critérios, cada nota vem com um veredito, e há um dashboard em HTML
+que gera um relatório A4 com link para compartilhar. São 71 testes automatizados, todos
+passando.
 
-O que ainda falta: coletar concorrentes e reclamações de verdade, gerar o relatório final em
-PDF, e publicar o serviço.
+O que ainda falta: coletar concorrentes e reclamações de verdade, publicar o serviço, e
+ligar a nota a uma ideia específica.
 
 ## Próximos passos
 
-- Gerar relatório final em PDF
 - Coletar concorrentes reais e extrair reclamações de usuários
-- Interface web e publicação do serviço
-- Coletar concorrentes reais e extrair reclamações de usuários
-- Integrar um modelo de linguagem e busca semântica (RAG)
-- Gerar relatório final em PDF
-- Interface web e publicação do serviço
+- Publicar o serviço e o dashboard
+- Dar um identificador de validação e fazer a nota ser por ideia
+- Relatório com mais de uma validação
 
 O detalhamento do que falta, das decisões já tomadas e do próximo passo imediato está em
 `ESTADO.md`.

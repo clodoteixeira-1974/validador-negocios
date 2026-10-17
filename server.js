@@ -10,6 +10,8 @@ const {
 
 const { calcularNota } = require('./nota');
 
+const { gerarHtmlRelatorio, gerarHtmlDashboard } = require('./relatorio');
+
 const PORTA_PADRAO = 3000;
 const LIMITE_CORPO = '100kb';
 const SERVICO = 'validador-negocios';
@@ -54,11 +56,76 @@ function validarIdeia(corpo) {
   return { ok: true, ideia };
 }
 
+// Gera um id único de validação: timestamp em ms + sufixo aleatório.
+function gerarId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 // Grava uma validação bem-sucedida em JSON Lines (append).
 // O caminho é opcional: os testes automatizados passam um arquivo temporário.
 function registrarValidacao(registro, arquivo = ARQUIVO_VALIDACOES) {
   const linha = JSON.stringify(registro);
   fs.appendFileSync(arquivo, linha + '\n', 'utf8');
+}
+
+// Procura uma validação pelo id. Devolve null quando não achar ou quando o
+// arquivo não existe. Linhas com JSON inválido são puladas em vez de quebrar a
+// leitura: um registro corrompido não deve derrubar o relatório das demais.
+function buscarValidacao(id, arquivo = ARQUIVO_VALIDACOES) {
+  if (!fs.existsSync(arquivo)) {
+    return null;
+  }
+
+  const linhas = fs.readFileSync(arquivo, 'utf8').split('\n').filter((linha) => linha.trim() !== '');
+
+  for (const linha of linhas) {
+    let registro;
+
+    try {
+      registro = JSON.parse(linha);
+    } catch (erro) {
+      continue;
+    }
+
+    if (registro && registro.id === id) {
+      return registro;
+    }
+  }
+
+  return null;
+}
+
+// Evidências cuja ideia_relacionada bate com o texto da ideia validada. Como o
+// campo é texto livre e não um identificador, a comparação é por substring.
+function evidenciasRelacionadas(ideia, arquivo) {
+  const evidencias = listarEvidencias(arquivo);
+  const alvo = String(ideia).trim().toLowerCase();
+
+  if (alvo === '') {
+    return [];
+  }
+
+  return evidencias.filter((evidencia) => {
+    const relacionada = String(evidencia.ideia_relacionada || '').trim().toLowerCase();
+    return relacionada !== '' && (alvo.includes(relacionada) || relacionada.includes(alvo));
+  });
+}
+
+// Página de erro do relatório: simples de propósito, sem CSS pesado.
+function paginaNaoEncontrada(id) {
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relatorio nao encontrado — Validador de Novos Negocios</title>
+</head>
+<body style="font-family: Georgia, serif; padding: 40px; color: #1a1a1a;">
+<h1>Relatório não encontrado</h1>
+<p>Não existe validação com o identificador <code>${id.replace(/[<>]/g, '')}</code>.</p>
+<p><a href="/dashboard">Voltar ao dashboard</a></p>
+</body>
+</html>`;
 }
 
 // Cria o app Express com as rotas. Não abre porta: use listen() quando precisar.
@@ -92,6 +159,7 @@ function createApp(opcoes = {}) {
     }
 
     const registro = {
+      id: gerarId(),
       ideia: resultado.ideia,
       tipo: classificarTipo(resultado.ideia),
       timestamp: new Date().toISOString()
@@ -101,6 +169,7 @@ function createApp(opcoes = {}) {
 
     res.json({
       recebido: true,
+      id: registro.id,
       ideia: registro.ideia,
       tipo: registro.tipo,
       timestamp: registro.timestamp
@@ -142,6 +211,26 @@ function createApp(opcoes = {}) {
   app.get('/nota', (req, res) => {
     const evidencias = listarEvidencias(arquivoEvidencias);
     return res.json(calcularNota(evidencias));
+  });
+
+  // Dashboard: formulário de ideia e resultado, com link de compartilhamento.
+  app.get('/dashboard', (req, res) => {
+    res.type('html').send(gerarHtmlDashboard());
+  });
+
+  // Relatório de uma validação, em HTML meant para impressão em A4.
+  app.get('/relatorio/:id', (req, res) => {
+    const validacao = buscarValidacao(req.params.id, arquivoValidacoes);
+
+    if (!validacao) {
+      return res.status(404).type('html').send(paginaNaoEncontrada(String(req.params.id)));
+    }
+
+    const nota = calcularNota(listarEvidencias(arquivoEvidencias));
+    const relacionadas = evidenciasRelacionadas(validacao.ideia, arquivoEvidencias);
+    const base = `${req.protocol}://${req.get('host') || ''}`;
+
+    return res.type('html').send(gerarHtmlRelatorio(validacao, nota, relacionadas, base));
   });
 
   // Qualquer outro metodo em /nota: 405 com Allow: GET
@@ -198,6 +287,9 @@ module.exports = {
   classificarTipo,
   validarIdeia,
   registrarValidacao,
+  gerarId,
+  buscarValidacao,
+  evidenciasRelacionadas,
   ARQUIVO_VALIDACOES,
   ARQUIVO_EVIDENCIAS,
   PORTA_PADRAO,

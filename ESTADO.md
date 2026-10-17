@@ -36,6 +36,14 @@ dados de verdade e o relatório final ainda não existem.
 
 - Endpoint `POST /validar-ideia`
 - Endpoints `POST /evidencias` e `GET /evidencias` (integrados ao `server.js`)
+- Endpoint `GET /dashboard`: página HTML com formulário de ideia, resultado e botão de
+  copiar o link do relatório
+- Endpoint `GET /relatorio/:id`: relatório HTML em folha A4, com a ideia, a data, a nota, o
+  veredito, os cinco critérios e as evidências relacionadas. Sem JavaScript
+- Cada validação recebe um `id` (timestamp + aleatório), devolvido na resposta de
+  `POST /validar-ideia` e que dá acesso ao relatório
+- Módulo `relatorio.js` gera as duas páginas, com o CSS embutido e sem recurso externo.
+  Sem dependência de PDF e sem Puppeteer: o PDF sai do navegador, por "Salvar como"
 - Endpoint `GET /nota` (a régua inteira: cinco critérios — "tem gente?", "tem gente
   insatisfeita?", "cabe mais um?", "alguém paga?" e "você alcança essas pessoas?")
 - Veredito derivado da nota, com campo novo na resposta: `decisao` (`PARAR`,
@@ -53,7 +61,7 @@ dados de verdade e o relatório final ainda não existem.
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 66 testes automatizados (32 em `server.test.js` + 11 em `evidencias.test.js` + 23 em
+- 71 testes automatizados (37 em `server.test.js` + 11 em `evidencias.test.js` + 23 em
   `nota.test.js`)
 
 ## O que não existe ainda
@@ -62,16 +70,9 @@ Alinhado ao fluxograma do projeto:
 
 - Coleta real de concorrentes
 - Extração de reclamações
+- Nota por ideia (hoje é geral)
 - Integração com LLM
 - RAG
-- Relatório em PDF
-- Frontend
-- Deploy
-- Coleta real de concorrentes
-- Extração de reclamações
-- Integração com LLM
-- RAG
-- Relatório em PDF
 - Frontend
 - Deploy
 
@@ -105,7 +106,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 
 - Servidor: não está rodando. Para iniciar: `npm start`
 - Porta padrão: 3000 (configurável via `PORT`)
-- Testes: `npm test` (66 passando)
+- Testes: `npm test` (71 passando)
 - Repositório GitHub: https://github.com/clodoteixeira-1974/validador-negocios
 - Branch principal: `main`
 
@@ -114,7 +115,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 66 testes automatizados
+npm test        # roda os 71 testes automatizados
 ```
 
 Exemplos de chamada:
@@ -140,16 +141,17 @@ Para usar outra porta: `PORT=8080 npm start` (Linux/macOS) ou
 
 ## Próximo passo
 
-**Tarefa 20 — relatório final em PDF**. A régua está completa e o veredito existe. Falta a
-etapa de entrega: transformar o resultado em um documento que uma pessoa possa ler sem
-chamar a API.
+**Tarefa 21 — coletar concorrentes e reclamações de verdade**. O produto está completo do
+lado do cálculo e da entrega: existe régua, veredito, dashboard e relatório. O que falta é o
+dado real, hoje tudo o que está em `validacoes.jsonl` e `evidencias.jsonl` é fictício e
+montado à mão.
 
-Vale decidir antes de implementar três coisas. Primeira: o PDF é gerado sob demanda por uma
-rota nova (`GET /relatorio`), ou gerado e guardado quando a ideia é validada. Segunda: as
-bibliotecas disponíveis — o projeto hoje tem **uma única dependência**, `express`, e um PDF
-exige uma segunda, o que contraria a decisão registrada de manter o projeto enxuto e sem
-dependências desnecessárias. Terceira: o que entra no documento além da nota e do veredito —
-as evidências completas, ou só o resumo.
+Esta é a primeira tarefa do projeto que vai depender de fonte externa, e aí aparecem
+decisões que nenhuma tarefa anterior teve que tomar: de onde vêm os dados, com que
+frequência se busca, se o coletor está proibido de fazer requisições aos sites consultados, e
+como um texto coletado vira evidência validada. A boa notícia é que o destino já existe:
+   `POST /evidencias` aceita qualquer fonte, e `validarEvidencia` já garante a forma do
+   registro.
 
 ## Pendências conhecidas
 
@@ -166,7 +168,12 @@ Permanecem em aberto, todas de ambiente ou de infraestrutura, nenhuma de código
 - **Sem `.env`**: quando a integração com LLM acontecer, faltará o arquivo de variáveis de
   ambiente e o `.env.example`. O `.gitignore` já está preparado para versionar o exemplo.
 - **Nota é geral, sem vínculo com uma ideia**: os cinco critérios contam evidências de
-  todas as ideias juntas, porque `ideia_relacionada` é texto livre e não há identificador
-  de validação. Isso é uma decisão já tomada (nota geral), não um defeito, mas com a régua
-  completa virou o principal limite de design do projeto: a nota não consegue dizer de quem
-  é. Resolver exige dar um `id` a `POST /validar-ideia`.
+  todas as ideias juntas, porque `ideia_relacionada` é texto livre. **Esta tarefa deu um
+  identificador a cada validação**, que é o primeiro passo para resolver isso: o relatório
+  agora sabe de qual validação fala. O que falta é fazer a nota e as evidências se
+  vincularem a esse identificador em vez de comparar texto. No relatório, as evidências são
+  associadas por substring do texto da ideia, o que é frágil e está registrado aqui como
+  limite conhecido.
+- **Link de compartilhamento sem controle de acesso**: qualquer pessoa com o link abre o
+  relatório. Não há autenticação nem segredo na URL. Se o relatório passar a conter dado
+  sensível, isso precisa ser resolvido antes.
