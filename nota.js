@@ -29,6 +29,12 @@ const MINIMO_CONCORRENTES_CABE_MAIS_UM = 2;
 const MAXIMO_CONCORRENTES_CABE_MAIS_UM = 4;
 const PONTOS_CABE_MAIS_UM = 1;
 
+// Critério 4 da régua: "alguém paga?".
+// Conta as evidências do tipo "monetizacao", que mostram que alguém já paga
+// por um serviço parecido. Basta uma para o ponto ser atribuído.
+const MINIMO_MONETIZACOES = 1;
+const PONTOS_ALGUEM_PAGA = 1;
+
 // Monta o texto do campo "detalhe" do critério "tem_gente".
 function detalharTemGente(total) {
   if (total === 0) {
@@ -70,6 +76,19 @@ function detalharCabeMaisUm(total) {
     : 'Mercado saturado.';
 
   return `${total} concorrentes registrados. ${situacao}`;
+}
+
+// Monta o texto do campo "detalhe" do critério "alguem_paga".
+function detalharAlguemPaga(total) {
+  if (total === 0) {
+    return 'Nenhuma evidencia de monetizacao registrada.';
+  }
+
+  if (total === 1) {
+    return '1 evidencia de monetizacao registrada.';
+  }
+
+  return `${total} evidencias de monetizacao registradas.`;
 }
 
 // Conta as evidências de um tipo, ignorando entradas nulas ou sem tipo.
@@ -128,12 +147,25 @@ function avaliarCabeMaisUm(evidencias) {
   };
 }
 
+// Avalia o critério "alguém paga?".
+// Cabe em avaliarContagem: é uma contagem com mínimo, sem máximo.
+function avaliarAlguemPaga(evidencias) {
+  return avaliarContagem(
+    evidencias,
+    'monetizacao',
+    MINIMO_MONETIZACOES,
+    PONTOS_ALGUEM_PAGA,
+    detalharAlguemPaga
+  );
+}
+
 // Lista os critérios implementados, na ordem da régua. Para acrescentar um
 // critério novo, basta declarar a função avaliadora e incluí-la aqui.
 const CRITERIOS = [
   { nome: 'tem_gente', avaliar: avaliarTemGente },
   { nome: 'tem_gente_insatisfeita', avaliar: avaliarTemGenteInsatisfeita },
-  { nome: 'cabe_mais_um', avaliar: avaliarCabeMaisUm }
+  { nome: 'cabe_mais_um', avaliar: avaliarCabeMaisUm },
+  { nome: 'alguem_paga', avaliar: avaliarAlguemPaga }
 ];
 
 // Calcula a nota completa.
@@ -167,5 +199,7 @@ module.exports = {
   PONTOS_TEM_GENTE_INSATISFEITA,
   MINIMO_CONCORRENTES_CABE_MAIS_UM,
   MAXIMO_CONCORRENTES_CABE_MAIS_UM,
-  PONTOS_CABE_MAIS_UM
+  PONTOS_CABE_MAIS_UM,
+  MINIMO_MONETIZACOES,
+  PONTOS_ALGUEM_PAGA
 };

@@ -7,7 +7,9 @@ const {
   MINIMO_RECLAMACOES,
   MINIMO_CONCORRENTES_CABE_MAIS_UM,
   MAXIMO_CONCORRENTES_CABE_MAIS_UM,
-  PONTOS_CABE_MAIS_UM
+  PONTOS_CABE_MAIS_UM,
+  MINIMO_MONETIZACOES,
+  PONTOS_ALGUEM_PAGA
 } = require('./nota');
 
 // Testes unitários puros: nenhuma leitura de disco, nenhuma requisição HTTP.
@@ -52,7 +54,7 @@ test('array vazio: tem_gente vale 0 e o detalhe avisa que nenhum foi registrado'
   assert.equal(nota.criterios.tem_gente.maximo, 1);
   assert.equal(nota.criterios.tem_gente.detalhe, 'Nenhum concorrente registrado. Minimo: 2.');
   assert.equal(nota.total, 0);
-  assert.equal(nota.maximo_possivel, 3);
+  assert.equal(nota.maximo_possivel, 4);
 });
 
 test('1 concorrente: tem_gente vale 0 e o detalhe cita o minimo de 2', () => {
@@ -78,7 +80,7 @@ test('2 concorrentes: tem_gente vale 1 e o detalhe mostra a contagem', () => {
   assert.equal(nota.criterios.tem_gente_insatisfeita.pontos, 0);
   assert.equal(nota.criterios.cabe_mais_um.pontos, 1);
   assert.equal(nota.total, 2);
-  assert.equal(nota.maximo_possivel, 3);
+  assert.equal(nota.maximo_possivel, 4);
 });
 
 test('3 concorrentes: tem_gente continua valendo 1 e o detalhe mostra a contagem', () => {
@@ -92,7 +94,7 @@ test('3 concorrentes: tem_gente continua valendo 1 e o detalhe mostra a contagem
   assert.equal(nota.criterios.tem_gente.detalhe, '3 concorrentes registrados');
   assert.equal(nota.criterios.cabe_mais_um.pontos, 1);
   assert.equal(nota.total, 2);
-  assert.equal(nota.maximo_possivel, 3);
+  assert.equal(nota.maximo_possivel, 4);
 });
 
 test('reclamacao e dado_mercado não contam como concorrente', () => {
@@ -137,7 +139,7 @@ test('0 reclamacoes: tem_gente_insatisfeita vale 0 e o detalhe avisa que não h�
   assert.equal(nota.criterios.tem_gente_insatisfeita.detalhe, 'Nenhuma reclamacao registrada.');
   assert.equal(nota.criterios.cabe_mais_um.pontos, 1);
   assert.equal(nota.total, 2);
-  assert.equal(nota.maximo_possivel, 3);
+  assert.equal(nota.maximo_possivel, 4);
 });
 
 test('1 reclamacao: tem_gente_insatisfeita vale 1, que é o mínimo exigido', () => {
@@ -148,7 +150,7 @@ test('1 reclamacao: tem_gente_insatisfeita vale 1, que é o mínimo exigido', ()
   assert.equal(nota.criterios.tem_gente_insatisfeita.maximo, 1);
   assert.equal(nota.criterios.tem_gente_insatisfeita.detalhe, '1 reclamacao registrada');
   assert.equal(nota.total, 1);
-  assert.equal(nota.maximo_possivel, 3);
+  assert.equal(nota.maximo_possivel, 4);
 });
 
 test('3 reclamacoes: tem_gente_insatisfeita continua valendo 1 e o detalhe mostra a contagem', () => {
@@ -161,7 +163,7 @@ test('3 reclamacoes: tem_gente_insatisfeita continua valendo 1 e o detalhe mostr
   assert.equal(nota.criterios.tem_gente_insatisfeita.pontos, 1);
   assert.equal(nota.criterios.tem_gente_insatisfeita.detalhe, '3 reclamacoes registradas');
   assert.equal(nota.total, 1);
-  assert.equal(nota.maximo_possivel, 3);
+  assert.equal(nota.maximo_possivel, 4);
 });
 
 test('cabe_mais_um: a faixa que vale ponto e de 2 a 4 concorrentes', () => {
@@ -220,6 +222,62 @@ test('cabe_mais_um e os limites declarados: 2 a 4 concorrentes', () => {
   assert.equal(MINIMO_CONCORRENTES_CABE_MAIS_UM, 2);
   assert.equal(MAXIMO_CONCORRENTES_CABE_MAIS_UM, 4);
   assert.equal(PONTOS_CABE_MAIS_UM, 1);
+});
+
+test('alguem_paga: 0 monetizacoes vale 0 e o detalhe avisa que nao ha nenhuma', () => {
+  const nota = calcularNota([]);
+
+  assert.equal(nota.criterios.alguem_paga.pontos, 0);
+  assert.equal(nota.criterios.alguem_paga.maximo, 1);
+  assert.equal(nota.criterios.alguem_paga.detalhe, 'Nenhuma evidencia de monetizacao registrada.');
+  assert.equal(nota.total, 0);
+  assert.equal(nota.maximo_possivel, 4);
+});
+
+test('alguem_paga: 1 evidencia de monetizacao vale 1, que e o minimo exigido', () => {
+  assert.equal(MINIMO_MONETIZACOES, 1);
+  assert.equal(PONTOS_ALGUEM_PAGA, 1);
+
+  const nota = calcularNota([evidencia('monetizacao')]);
+
+  assert.equal(nota.criterios.alguem_paga.pontos, 1);
+  assert.equal(nota.criterios.alguem_paga.maximo, 1);
+  assert.equal(nota.criterios.alguem_paga.detalhe, '1 evidencia de monetizacao registrada.');
+  assert.equal(nota.total, 1);
+  assert.equal(nota.maximo_possivel, 4);
+});
+
+test('alguem_paga: 3 evidencias continua valendo 1 e o detalhe mostra a contagem', () => {
+  const nota = calcularNota([
+    evidencia('monetizacao', { id: 'm1' }),
+    evidencia('monetizacao', { id: 'm2' }),
+    evidencia('monetizacao', { id: 'm3' })
+  ]);
+
+  assert.equal(nota.criterios.alguem_paga.pontos, 1);
+  assert.equal(nota.criterios.alguem_paga.detalhe, '3 evidencias de monetizacao registradas.');
+  assert.equal(nota.total, 1);
+  assert.equal(nota.maximo_possivel, 4);
+});
+
+test('alguem_paga: so o tipo monetizacao pontua neste criterio', () => {
+  // Outros tipos nao contam como prova de que alguem paga.
+  const nota = calcularNota([
+    evidencia('concorrente'),
+    evidencia('reclamacao'),
+    evidencia('dado_mercado')
+  ]);
+
+  assert.equal(nota.criterios.alguem_paga.pontos, 0);
+  assert.equal(nota.criterios.alguem_paga.detalhe, 'Nenhuma evidencia de monetizacao registrada.');
+
+  // Um concorrente com texto de preco continua sendo concorrente, nao monetizacao.
+  const comPreco = calcularNota([
+    evidencia('concorrente', { trecho_bruto: 'Assina por R$ 19,90 por mes.' })
+  ]);
+
+  assert.equal(comPreco.criterios.alguem_paga.pontos, 0);
+  assert.equal(comPreco.criterios.tem_gente.pontos, 0);
 });
 
 test('o total e a soma dos criterios e o maximo_possivel e a soma dos maximos', () => {
@@ -300,6 +358,28 @@ test('o total e a soma dos criterios e o maximo_possivel e a soma dos maximos', 
         evidencia('reclamacao', { id: 'r1' })
       ],
       total: 3
+    },
+    {
+      nome: '2 concorrentes + 1 reclamacao + 1 monetizacao, os quatro criterios pontuam',
+      evidencias: [
+        evidencia('concorrente', { id: 'c1' }),
+        evidencia('concorrente', { id: 'c2' }),
+        evidencia('reclamacao', { id: 'r1' }),
+        evidencia('monetizacao', { id: 'm1' })
+      ],
+      total: 4
+    },
+    {
+      nome: '5 concorrentes + 1 reclamacao + 0 monetizacao',
+      evidencias: [
+        evidencia('concorrente', { id: 'c1' }),
+        evidencia('concorrente', { id: 'c2' }),
+        evidencia('concorrente', { id: 'c3' }),
+        evidencia('concorrente', { id: 'c4' }),
+        evidencia('concorrente', { id: 'c5' }),
+        evidencia('reclamacao', { id: 'r1' })
+      ],
+      total: 2
     }
   ];
 
@@ -307,7 +387,7 @@ test('o total e a soma dos criterios e o maximo_possivel e a soma dos maximos', 
     const nota = calcularNota(caso.evidencias);
 
     assert.equal(nota.total, caso.total, caso.nome);
-    assert.equal(nota.maximo_possivel, 3, caso.nome);
+    assert.equal(nota.maximo_possivel, 4, caso.nome);
 
     // O total é exatamente a soma dos pontos declarados pelos critérios.
     const somaPontos = Object.values(nota.criterios)
@@ -364,10 +444,11 @@ test('o detalhe acompanha a contagem em todos os casos e a saida tem a forma com
 
     // A forma da resposta é sempre a mesma, com as mesmas chaves.
     assert.deepEqual(Object.keys(nota), ['criterios', 'total', 'maximo_possivel']);
-    assert.deepEqual(Object.keys(nota.criterios), ['tem_gente', 'tem_gente_insatisfeita', 'cabe_mais_um']);
+    assert.deepEqual(Object.keys(nota.criterios), ['tem_gente', 'tem_gente_insatisfeita', 'cabe_mais_um', 'alguem_paga']);
     assert.deepEqual(Object.keys(nota.criterios.tem_gente), ['pontos', 'maximo', 'detalhe']);
     assert.deepEqual(Object.keys(nota.criterios.tem_gente_insatisfeita), ['pontos', 'maximo', 'detalhe']);
     assert.deepEqual(Object.keys(nota.criterios.cabe_mais_um), ['pontos', 'maximo', 'detalhe']);
+    assert.deepEqual(Object.keys(nota.criterios.alguem_paga), ['pontos', 'maximo', 'detalhe']);
 
     for (const criterio of Object.values(nota.criterios)) {
       assert.equal(typeof criterio.pontos, 'number');
@@ -384,5 +465,5 @@ test('o detalhe acompanha a contagem em todos os casos e a saida tem a forma com
   // Entrada fora do contrato não quebra o cálculo.
   assert.equal(calcularNota(undefined).total, 0);
   assert.equal(calcularNota(null).total, 0);
-  assert.equal(calcularNota(undefined).maximo_possivel, 3);
+  assert.equal(calcularNota(undefined).maximo_possivel, 4);
 });

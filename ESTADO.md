@@ -29,18 +29,20 @@ O Validador de Novos Negócios é um serviço HTTP que recebe a descrição de u
 negócio, classifica o tipo dela e registra a validação com data e hora. Ele também recebe
 e lista evidências de mercado (concorrentes, reclamações de usuários e dados de setor) e
 calcula uma nota de viabilidade a partir delas. Hoje ele valida, classifica, guarda as
-evidências e aplica três critérios da régua; a coleta de dados de verdade e o
+evidências e aplica quatro critérios da régua; a coleta de dados de verdade e o
 relatório final ainda não existem.
 
 ## O que existe hoje
 
 - Endpoint `POST /validar-ideia`
 - Endpoints `POST /evidencias` e `GET /evidencias` (integrados ao `server.js`)
-- Endpoint `GET /nota` (três critérios da régua: "tem gente?", "tem gente insatisfeita?" e
-  "cabe mais um?")
+- Endpoint `GET /nota` (quatro critérios da régua: "tem gente?", "tem gente insatisfeita?",
+  "cabe mais um?" e "alguém paga?")
 - Módulo `nota.js` com a função `calcularNota(evidencias)`, sem I/O e sem dependências.
   Cada critério devolve `pontos`, `maximo` e `detalhe`; `total` e `maximo_possivel` são
   somas
+- Quatro tipos de evidência aceitos: `concorrente`, `reclamacao`, `dado_mercado` e
+  `monetizacao`. O tipo `monetizacao` foi criado para o quarto critério
 - Classificação mobile/outro (palavras-chave `app`, `aplicativo`)
 - Persistência em `validacoes.jsonl` e `evidencias.jsonl`
 - Módulo `evidencias.js`, com caminho de arquivo injetável para que os testes não toquem
@@ -48,14 +50,14 @@ relatório final ainda não existem.
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 47 testes automatizados (27 em `server.test.js` + 7 em `evidencias.test.js` + 13 em
+- 54 testes automatizados (28 em `server.test.js` + 9 em `evidencias.test.js` + 17 em
   `nota.test.js`)
 
 ## O que não existe ainda
 
 Alinhado ao fluxograma do projeto:
 
-- Demais critérios da régua (2 dos 5 ainda não implementados)
+- 1 dos 5 critérios da régua ainda não implementado ("você alcança essas pessoas?")
 - Coleta real de concorrentes
 - Extração de reclamações
 - Integração com LLM
@@ -94,7 +96,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 
 - Servidor: não está rodando. Para iniciar: `npm start`
 - Porta padrão: 3000 (configurável via `PORT`)
-- Testes: `npm test` (47 passando)
+- Testes: `npm test` (54 passando)
 - Repositório GitHub: https://github.com/clodoteixeira-1974/validador-negocios
 - Branch principal: `main`
 
@@ -103,7 +105,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 47 testes automatizados
+npm test        # roda os 54 testes automatizados
 ```
 
 Exemplos de chamada:
@@ -129,17 +131,19 @@ Para usar outra porta: `PORT=8080 npm start` (Linux/macOS) ou
 
 ## Próximo passo
 
-**Tarefa 17 — quarto critério da régua: "alguém paga?"**. Os três primeiros já existem.
-Este é o primeiro critério que não é uma simples contagem de evidências, e vale decidir
-com cuidado o que ele vai olhar e com que dado ele vai contar. Com a estrutura atual do
-`nota.js`, o que não muda é a forma: escrever o detalhe, o avaliador devolvendo
+**Tarefa 18 — quinto e último critério da régua: "você alcança essas pessoas?"**. Quatro
+de cinco já existem. Este é o critério mais difícil determinístico: responder se o
+público-alvo é alcançável depende de um dado que o modelo de evidência ainda não tem (algo
+entre público-alvo e canal de acesso). Vale decidir primeiro se cabe no modelo atual ou se
+exige um tipo de evidência novo, como o quarto critério exigiu. Com a estrutura atual do
+`nota.js`, a parte mecânica é a mesma de sempre: escrever o detalhe, o avaliador devolvendo
 `{ pontos, maximo, detalhe }`, e declarar uma linha em `CRITERIOS`. `total` e
-`maximo_possivel` passam a 4 sozinhos.
+`maximo_possivel` passam a 5 sozinhos, e a régua fica completa.
 
 ## Pendências conhecidas
 
-Nada foi adiado nesta tarefa. As pendências que existiam sobre o 405 de `/nota` e de
-`/evidencias` foram resolvidas no fix-01.
+Nada foi adiado nesta tarefa. As pendências sobre o 405 de `/nota` e de `/evidencias` foram
+resolvidas no fix-01.
 
 Permanecem em aberto, todas de ambiente ou de infraestrutura, nenhuma de código:
 
@@ -150,3 +154,8 @@ Permanecem em aberto, todas de ambiente ou de infraestrutura, nenhuma de código
   máquina local. Falta o script para rodar via `cron` na VPS.
 - **Sem `.env`**: quando a integração com LLM acontecer, faltará o arquivo de variáveis de
   ambiente e o `.env.example`. O `.gitignore` já está preparado para versionar o exemplo.
+- **Nota é geral, sem vínculo com uma ideia**: os quatro critérios contam evidências de
+  todas as ideias juntas, porque `ideia_relacionada` é texto livre e não há identificador
+  de validação. Isso é uma decisão já tomada (nota geral), não um defeito, mas é o
+  principal limite de design do projeto hoje. Resolver exige dar um `id` a
+  `POST /validar-ideia`.

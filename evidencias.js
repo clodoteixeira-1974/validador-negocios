@@ -5,7 +5,7 @@ const path = require('path');
 const ARQUIVO_EVIDENCIAS = path.join(__dirname, 'evidencias.jsonl');
 
 // Tipos aceitos
-const TIPOS = ['concorrente', 'reclamacao', 'dado_mercado'];
+const TIPOS = ['concorrente', 'reclamacao', 'dado_mercado', 'monetizacao'];
 
 // Níveis de relevância aceitos
 const RELEVANCIAS = ['alta', 'media', 'baixa'];

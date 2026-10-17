@@ -370,10 +370,15 @@ test('GET /nota com arquivo de evidencias vazio: 200 com total 0', async () => {
           pontos: 0,
           maximo: 1,
           detalhe: 'Nenhum concorrente registrado. Mercado vazio.'
+        },
+        alguem_paga: {
+          pontos: 0,
+          maximo: 1,
+          detalhe: 'Nenhuma evidencia de monetizacao registrada.'
         }
       },
       total: 0,
-      maximo_possivel: 3
+      maximo_possivel: 4
     });
   });
 });
@@ -395,7 +400,7 @@ test('GET /nota apos 2 concorrentes: 200 com tem_gente.pontos igual a 1', async 
     assert.equal(r.corpo.criterios.cabe_mais_um.detalhe, '2 concorrentes registrados. Ha espaco para mais um.');
 
     assert.equal(r.corpo.total, 2);
-    assert.equal(r.corpo.maximo_possivel, 3);
+    assert.equal(r.corpo.maximo_possivel, 4);
   });
 });
 
@@ -421,7 +426,7 @@ test('GET /nota com 1 concorrente e 1 reclamacao: tem_gente vale 0 e a insatisfe
     assert.equal(r.corpo.criterios.cabe_mais_um.detalhe, '1 concorrente registrado. Mercado pequeno.');
 
     assert.equal(r.corpo.total, 1);
-    assert.equal(r.corpo.maximo_possivel, 3);
+    assert.equal(r.corpo.maximo_possivel, 4);
 
     // As duas evidências continuam registradas: a nota não consome nem apaga nada.
     const evidencias = await getEvidencias(base);
@@ -429,7 +434,7 @@ test('GET /nota com 1 concorrente e 1 reclamacao: tem_gente vale 0 e a insatisfe
   });
 });
 
-test('GET /nota com 2 concorrentes e 1 reclamacao: total 3 e maximo_possivel 3', async () => {
+test('GET /nota com 2 concorrentes e 1 reclamacao: total 3 de maximo_possivel 4', async () => {
   await comServidor(async ({ base }) => {
     await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A' }));
     await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B' }));
@@ -442,7 +447,7 @@ test('GET /nota com 2 concorrentes e 1 reclamacao: total 3 e maximo_possivel 3',
     assert.equal(r.corpo.criterios.tem_gente_insatisfeita.pontos, 1);
     assert.equal(r.corpo.criterios.cabe_mais_um.pontos, 1);
     assert.equal(r.corpo.total, 3);
-    assert.equal(r.corpo.maximo_possivel, 3);
+    assert.equal(r.corpo.maximo_possivel, 4);
   });
 });
 
@@ -467,11 +472,48 @@ test('GET /nota com 5 concorrentes: tem_gente vale 1 e cabe_mais_um vale 0', asy
     assert.equal(r.corpo.criterios.tem_gente_insatisfeita.pontos, 0);
 
     assert.equal(r.corpo.total, 1);
-    assert.equal(r.corpo.maximo_possivel, 3);
+    assert.equal(r.corpo.maximo_possivel, 4);
 
     // As cinco evidências continuam registradas.
     const evidencias = await getEvidencias(base);
     assert.equal(evidencias.corpo.total, 5);
+  });
+});
+
+test('POST /evidencias com tipo "monetizacao" é aceito e alimenta o quarto critério', async () => {
+  await comServidor(async ({ base, arquivoEvidencias }) => {
+    const r = await postEvidencia(base, evidenciaValida({
+      tipo: 'monetizacao',
+      fonte: 'Pagina de precos de concorrente',
+      url: 'https://exemplo.com/precos',
+      trecho_bruto: 'Planos a partir de R$ 19,90 por mes.',
+      ideia_relacionada: 'App para controlar gastos',
+      relevancia: 'alta'
+    }));
+
+    // O tipo novo é aceito pela API, que antes responderia 400.
+    assert.equal(r.status, 201);
+    assert.equal(r.corpo.tipo, 'monetizacao');
+    assert.equal(r.corpo.fonte, 'Pagina de precos de concorrente');
+    assert.match(r.corpo.timestamp, /^\d{4}-\d{2}-\d{2}T/);
+
+    // A evidência foi realmente gravada.
+    const linhas = lerLinhas(arquivoEvidencias);
+    assert.equal(linhas.length, 1);
+    assert.equal(JSON.parse(linhas[0]).tipo, 'monetizacao');
+
+    // E aparece na listagem.
+    const evidencias = await getEvidencias(base);
+    assert.equal(evidencias.corpo.total, 1);
+    assert.equal(evidencias.corpo.evidencias[0].tipo, 'monetizacao');
+
+    // E faz o quarto critério pontuar.
+    const nota = await getNota(base);
+    assert.equal(nota.status, 200);
+    assert.equal(nota.corpo.criterios.alguem_paga.pontos, 1);
+    assert.equal(nota.corpo.criterios.alguem_paga.detalhe, '1 evidencia de monetizacao registrada.');
+    assert.equal(nota.corpo.total, 1);
+    assert.equal(nota.corpo.maximo_possivel, 4);
   });
 });
 

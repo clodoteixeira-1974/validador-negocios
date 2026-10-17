@@ -7,6 +7,8 @@ const path = require('node:path');
 const {
   registrarEvidencia,
   listarEvidencias,
+  validarEvidencia,
+  TIPOS,
   ARQUIVO_EVIDENCIAS
 } = require('./evidencias');
 
@@ -178,4 +180,51 @@ test('nenhum teste grava no evidencias.jsonl de produção', async () => {
   const depois = contagemLinhas(ARQUIVO_EVIDENCIAS);
 
   assert.equal(depois, antes);
+});
+
+test('tipo "monetizacao" é aceito, gravado e listado', async () => {
+  await comArquivo(async (arquivo) => {
+    // O novo tipo está na lista de tipos válidos.
+    assert.ok(TIPOS.includes('monetizacao'));
+
+    const gravada = registrarEvidencia(definicaoValida({
+      tipo: 'monetizacao',
+      fonte: 'Pagina de precos de concorrente',
+      url: 'https://exemplo.com/precos',
+      trecho_bruto: 'Planos a partir de R$ 19,90 por mes.',
+      relevancia: 'alta'
+    }), arquivo);
+
+    assert.equal(gravada.tipo, 'monetizacao');
+    assert.equal(gravada.fonte, 'Pagina de precos de concorrente');
+
+    // Nada foi recusado: o registro está no arquivo e volta na listagem.
+    const linhas = lerLinhas(arquivo);
+    assert.equal(linhas.length, 1);
+
+    const listadas = listarEvidencias(arquivo);
+    assert.equal(listadas.length, 1);
+    assert.deepEqual(listadas[0], gravada);
+    assert.equal(listadas[0].tipo, 'monetizacao');
+
+    // E continua sendo uma evidência válida para o módulo.
+    assert.deepEqual(validarEvidencia(gravada), []);
+  });
+});
+
+test('o tipo "monetizacao" convive com os outros tres na mesma gravacao', async () => {
+  await comArquivo(async (arquivo) => {
+    registrarEvidencia(definicaoValida({ tipo: 'concorrente' }), arquivo);
+    registrarEvidencia(definicaoValida({ tipo: 'reclamacao' }), arquivo);
+    registrarEvidencia(definicaoValida({ tipo: 'dado_mercado' }), arquivo);
+    registrarEvidencia(definicaoValida({ tipo: 'monetizacao' }), arquivo);
+
+    const listadas = listarEvidencias(arquivo);
+
+    assert.equal(listadas.length, 4);
+    assert.deepEqual(
+      listadas.map((evidencia) => evidencia.tipo),
+      ['concorrente', 'reclamacao', 'dado_mercado', 'monetizacao']
+    );
+  });
 });
