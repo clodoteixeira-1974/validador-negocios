@@ -254,6 +254,38 @@ test('falha do OpenRouter: 400 e nenhuma validacao gravada', async () => {
   });
 });
 
+test('erro encapsulado pelo OpenRouter mostra a causa retornada pelo provedor', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    const r = await post(base, { imagem_base64: 'data:image/png;base64,aGVsbG8=' });
+
+    assert.equal(r.status, 400);
+    assert.equal(
+      r.corpo.error,
+      'Falha ao processar imagem: The image data you provided does not represent a valid image. Please check your input and try again.'
+    );
+    assert.equal(lerLinhas(arquivo).length, 0);
+  }, {
+    openRouterApiKey: 'chave-de-teste',
+    fetchOpenRouter: async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        error: {
+          message: 'Provider returned error',
+          metadata: {
+            raw: JSON.stringify({
+              error: {
+                message: 'The image data you provided does not represent a valid image. Please check your input and try again.',
+                code: 'invalid_value'
+              }
+            })
+          }
+        }
+      })
+    })
+  });
+});
+
 test('GET /relatorio/:id inclui a imagem salva na validacao', async () => {
   const imagem = 'data:image/png;base64,aGVsbG8=';
 

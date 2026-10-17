@@ -43,6 +43,13 @@ para extrair a descrição da imagem, não para classificar a ideia nem calcular
 lê `OPENROUTER_API_KEY` e `OPENROUTER_MODEL` do ambiente e não carrega um arquivo `.env`
 automaticamente.
 
+A requisição multimodal usa o formato Chat Completions: uma mensagem com conteúdo em lista,
+contendo texto e `image_url` com a data URI da imagem. Esse formato foi validado em chamada
+real ao OpenRouter com uma imagem PNG contendo texto; o Luna aceitou a imagem e retornou a
+transcrição. Se o OpenRouter responder `Provider returned error` e incluir uma mensagem JSON em
+`error.metadata.raw`, o servidor repassa a mensagem interna do provedor na resposta de erro,
+em vez de ocultá-la atrás do erro genérico.
+
 Formato do `id`: **UUID versão 4**, por exemplo
 `550e8400-e29b-41d4-a716-446655440000`. São 36 caracteres, em formato hexadecimal
 separado por hífen, com o terceiro bloco começando em `4` e o quarto em `8`, `9`, `a` ou `b`.

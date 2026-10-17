@@ -142,7 +142,23 @@ async function extrairDescricaoImagem(imagem, fetchOpenRouter, apiKey, model) {
   }
 
   if (!resposta.ok) {
-    const motivo = corpo && corpo.error && corpo.error.message;
+    const erroOpenRouter = corpo && corpo.error;
+    let motivo = erroOpenRouter && erroOpenRouter.message;
+
+    // O OpenRouter pode encapsular o erro do provedor em metadata.raw e deixar
+    // apenas "Provider returned error" na mensagem de topo. Exponha a causa
+    // legível para que o cliente consiga distinguir imagem inválida de falha genérica.
+    const erroBruto = erroOpenRouter && erroOpenRouter.metadata && erroOpenRouter.metadata.raw;
+
+    if (motivo === 'Provider returned error' && typeof erroBruto === 'string') {
+      try {
+        const detalhe = JSON.parse(erroBruto);
+        motivo = detalhe && detalhe.error && detalhe.error.message || motivo;
+      } catch {
+        // Mantém a mensagem original do OpenRouter se o detalhe não for JSON válido.
+      }
+    }
+
     throw new Error(motivo || `OpenRouter respondeu HTTP ${resposta.status}`);
   }
 

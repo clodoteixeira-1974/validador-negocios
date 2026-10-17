@@ -55,6 +55,8 @@ real, e as rotas de escrita continuam sem autenticação, apesar do limite de ta
 - Tarefa 26: limite de taxa por IP nas rotas caras, em `rate-limit.js`
 - fix-11: upload de imagem e extração da descrição com OpenRouter, sem alterar a régua de nota
 - fix-12: modelo de visão padrão do OpenRouter trocado para `openai/gpt-5.6-luna`
+- fix-13: chamada real confirmou OCR do Luna com PNG válido; rota HTTP e relatório A4
+  validados ponta a ponta; erros genéricos do OpenRouter agora expõem a causa interna
 
 ### Decisões do PO sobre acesso e apresentação
 
@@ -236,7 +238,7 @@ HTML A4. A descrição pode ser digitada ou extraída de uma imagem via OpenRout
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 121 testes automatizados (79 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
+- 122 testes automatizados (80 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
   `nota.test.js`)
 - **Leitura de `.jsonl` resiliente e unificada**: `validacoes.jsonl` e `evidencias.jsonl` são
   lidos pela mesma função, em `jsonl.js`. Linha corrompida é ignorada com aviso em
@@ -271,7 +273,8 @@ HTML A4. A descrição pode ser digitada ou extraída de uma imagem via OpenRout
 - **Upload de imagem opcional** no dashboard: data URI limitada a 10 MB após decodificação,
   pré-visualizada no navegador e armazenada com a validação. `OPENROUTER_API_KEY` é lida do
   ambiente; o modelo de visão padrão em `OPENROUTER_MODEL` é `openai/gpt-5.6-luna`, podendo
-  ser substituído pela variável de ambiente.
+  ser substituído pela variável de ambiente. O formato `image_url` foi validado em chamada real
+  com PNG; o erro encapsulado do provedor agora apresenta sua causa legível quando disponível.
 
 ## O que não existe ainda
 

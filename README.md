@@ -228,6 +228,13 @@ Configure `OPENROUTER_API_KEY` no ambiente antes de iniciar o servidor. O arquiv
 `OPENROUTER_MODEL` é opcional e, se ausente, usa
 `openai/gpt-5.6-luna`, o modelo de visão padrão.
 
+O fix-13 validou uma imagem PNG com texto por chamada real ao OpenRouter: o Luna retornou a
+transcrição esperada, e o fluxo HTTP gravou a ideia extraída e preservou a imagem exibida no
+relatório A4. A chamada usou o formato multimodal `image_url` já adotado pelo servidor; o erro
+genérico `Provider returned error` agora revela a mensagem interna enviada pelo provedor quando
+ela está disponível. Essa validação confirma o fluxo para a imagem testada, não uma garantia de
+disponibilidade contínua do provedor.
+
 PowerShell:
 
 ```powershell
