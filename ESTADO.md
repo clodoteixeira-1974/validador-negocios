@@ -29,8 +29,8 @@ O Validador de Novos Negócios é um serviço HTTP que recebe a descrição de u
 negócio, classifica o tipo dela e registra a validação com data e hora. Ele também recebe
 e lista evidências de mercado (concorrentes, reclamações de usuários e dados de setor) e
 calcula uma nota de viabilidade a partir delas. Hoje ele valida, classifica, guarda as
-evidências e aplica a régua inteira, com cinco critérios; a coleta de dados de verdade, o
-veredito e o relatório final ainda não existem.
+evidências e aplica a régua inteira, com cinco critérios, e deriva o veredito; a coleta de
+dados de verdade e o relatório final ainda não existem.
 
 ## O que existe hoje
 
@@ -38,9 +38,12 @@ veredito e o relatório final ainda não existem.
 - Endpoints `POST /evidencias` e `GET /evidencias` (integrados ao `server.js`)
 - Endpoint `GET /nota` (a régua inteira: cinco critérios — "tem gente?", "tem gente
   insatisfeita?", "cabe mais um?", "alguém paga?" e "você alcança essas pessoas?")
-- Módulo `nota.js` com a função `calcularNota(evidencias)`, sem I/O e sem dependências.
-  Cada critério devolve `pontos`, `maximo` e `detalhe`; `total` e `maximo_possivel` são
-  somas. A escala está fechada em 0 a 5
+- Veredito derivado da nota, com campo novo na resposta: `decisao` (`PARAR`,
+  `MUDAR_O_RECORTE` ou `SEGUIR`), `faixa` e `explicacao`. Faixas conservadoras:
+  0-1 para, 2-3 muda o recorte, 4-5 segue
+- Módulo `nota.js` com as funções `calcularNota(evidencias)` e `derivarVeredito(total,
+  maximoPossivel)`, sem I/O e sem dependências. Cada critério devolve `pontos`, `maximo` e
+  `detalhe`; `total` e `maximo_possivel` são somas. A escala está fechada em 0 a 5
 - Cinco tipos de evidência aceitos: `concorrente`, `reclamacao`, `dado_mercado`,
   `monetizacao` e `alcance`. Os dois últimos foram criados para o quarto e o quinto critério
 - Classificação mobile/outro (palavras-chave `app`, `aplicativo`)
@@ -50,14 +53,13 @@ veredito e o relatório final ainda não existem.
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 62 testes automatizados (30 em `server.test.js` + 11 em `evidencias.test.js` + 21 em
+- 66 testes automatizados (32 em `server.test.js` + 11 em `evidencias.test.js` + 23 em
   `nota.test.js`)
 
 ## O que não existe ainda
 
 Alinhado ao fluxograma do projeto:
 
-- Derivação do veredito a partir da nota (parar, mudar o recorte ou seguir)
 - Coleta real de concorrentes
 - Extração de reclamações
 - Integração com LLM
@@ -103,7 +105,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 
 - Servidor: não está rodando. Para iniciar: `npm start`
 - Porta padrão: 3000 (configurável via `PORT`)
-- Testes: `npm test` (62 passando)
+- Testes: `npm test` (66 passando)
 - Repositório GitHub: https://github.com/clodoteixeira-1974/validador-negocios
 - Branch principal: `main`
 
@@ -112,7 +114,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 62 testes automatizados
+npm test        # roda os 66 testes automatizados
 ```
 
 Exemplos de chamada:
@@ -138,16 +140,16 @@ Para usar outra porta: `PORT=8080 npm start` (Linux/macOS) ou
 
 ## Próximo passo
 
-**Tarefa 19 — derivação do veredito a partir da nota**. A régua está completa, então falta a
-etapa seguinte do fluxograma: transformar a nota em uma decisão. O fluxograma prevê três
-desfechos — parar, mudar o recorte ou seguir — e essa tradução hoje não existe em lugar
-nenhum do código.
+**Tarefa 20 — relatório final em PDF**. A régua está completa e o veredito existe. Falta a
+etapa de entrega: transformar o resultado em um documento que uma pessoa possa ler sem
+chamar a API.
 
-Vale decidir com o PO três coisas antes de implementar: quais faixas de nota levam a cada
-desfecho, se o veredito é apenas informativo ou se passa a aparecer em outra rota, e se ele
-entra em `GET /nota` como um campo novo ou vem em recurso separado. A segunda e a terceira
-mudam o contrato da API, e o teste da forma da resposta vai quebrar quando qualquer uma
-mudar.
+Vale decidir antes de implementar três coisas. Primeira: o PDF é gerado sob demanda por uma
+rota nova (`GET /relatorio`), ou gerado e guardado quando a ideia é validada. Segunda: as
+bibliotecas disponíveis — o projeto hoje tem **uma única dependência**, `express`, e um PDF
+exige uma segunda, o que contraria a decisão registrada de manter o projeto enxuto e sem
+dependências desnecessárias. Terceira: o que entra no documento além da nota e do veredito —
+as evidências completas, ou só o resumo.
 
 ## Pendências conhecidas
 

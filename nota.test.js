@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   calcularNota,
+  derivarVeredito,
   MINIMO_CONCORRENTES,
   MINIMO_RECLAMACOES,
   MINIMO_CONCORRENTES_CABE_MAIS_UM,
@@ -339,6 +340,92 @@ test('alcance: so o tipo alcance pontua neste criterio', () => {
   assert.equal(comPublico.criterios.tem_gente_insatisfeita.pontos, 1);
 });
 
+test('derivarVeredito: cada total da escala cai na faixa correta', () => {
+  const esperado = [
+    { total: 0, decisao: 'PARAR', faixa: '0 a 1', explicacao: 'Sem informacao suficiente. Nao vale seguir.' },
+    { total: 1, decisao: 'PARAR', faixa: '0 a 1', explicacao: 'Sem informacao suficiente. Nao vale seguir.' },
+    {
+      total: 2,
+      decisao: 'MUDAR_O_RECORTE',
+      faixa: '2 a 3',
+      explicacao: 'Existe sinal, mas o publico ou a oferta precisa ser ajustada.'
+    },
+    {
+      total: 3,
+      decisao: 'MUDAR_O_RECORTE',
+      faixa: '2 a 3',
+      explicacao: 'Existe sinal, mas o publico ou a oferta precisa ser ajustada.'
+    },
+    {
+      total: 4,
+      decisao: 'SEGUIR',
+      faixa: '4 a 5',
+      explicacao: 'Vale gastar as proximas 24h testando com gente de verdade.'
+    },
+    {
+      total: 5,
+      decisao: 'SEGUIR',
+      faixa: '4 a 5',
+      explicacao: 'Vale gastar as proximas 24h testando com gente de verdade.'
+    }
+  ];
+
+  for (const caso of esperado) {
+    const veredito = derivarVeredito(caso.total, 5);
+
+    assert.equal(veredito.decisao, caso.decisao, `total ${caso.total}`);
+    assert.equal(veredito.faixa, caso.faixa, `total ${caso.total}`);
+    assert.equal(veredito.explicacao, caso.explicacao, `total ${caso.total}`);
+
+    // A explicação nunca vem vazia.
+    assert.notEqual(veredito.explicacao.trim(), '', `total ${caso.total}`);
+    assert.deepEqual(Object.keys(veredito), ['decisao', 'faixa', 'explicacao']);
+  }
+});
+
+test('o veredito acompanha o total em cenarios reais de evidencias', () => {
+  const cenarios = [
+    {
+      nome: 'nenhuma evidencia',
+      evidencias: [],
+      total: 0,
+      decisao: 'PARAR'
+    },
+    {
+      nome: 'regua completa',
+      evidencias: [
+        evidencia('concorrente', { id: 'c1' }),
+        evidencia('concorrente', { id: 'c2' }),
+        evidencia('reclamacao', { id: 'r1' }),
+        evidencia('monetizacao', { id: 'm1' }),
+        evidencia('alcance', { id: 'a1' })
+      ],
+      total: 5,
+      decisao: 'SEGUIR'
+    },
+    {
+      nome: '3 concorrentes + 1 reclamacao',
+      evidencias: [
+        evidencia('concorrente', { id: 'c1' }),
+        evidencia('concorrente', { id: 'c2' }),
+        evidencia('concorrente', { id: 'c3' }),
+        evidencia('reclamacao', { id: 'r1' })
+      ],
+      total: 3,
+      decisao: 'MUDAR_O_RECORTE'
+    }
+  ];
+
+  for (const cenario of cenarios) {
+    const nota = calcularNota(cenario.evidencias);
+
+    assert.equal(nota.total, cenario.total, cenario.nome);
+    assert.equal(nota.veredito.decisao, cenario.decisao, cenario.nome);
+    assert.equal(nota.maximo_possivel, 5, cenario.nome);
+    assert.notEqual(nota.veredito.explicacao.trim(), '', cenario.nome);
+  }
+});
+
 test('o total e a soma dos criterios e o maximo_possivel e a soma dos maximos', () => {
   const casos = [
     {
@@ -525,13 +612,18 @@ test('o detalhe acompanha a contagem em todos os casos e a saida tem a forma com
     assert.equal(nota.criterios.tem_gente_insatisfeita.detalhe, caso.reclamacoes);
 
     // A forma da resposta é sempre a mesma, com as mesmas chaves.
-    assert.deepEqual(Object.keys(nota), ['criterios', 'total', 'maximo_possivel']);
+    assert.deepEqual(Object.keys(nota), ['criterios', 'total', 'maximo_possivel', 'veredito']);
     assert.deepEqual(Object.keys(nota.criterios), ['tem_gente', 'tem_gente_insatisfeita', 'cabe_mais_um', 'alguem_paga', 'alcance']);
     assert.deepEqual(Object.keys(nota.criterios.tem_gente), ['pontos', 'maximo', 'detalhe']);
     assert.deepEqual(Object.keys(nota.criterios.tem_gente_insatisfeita), ['pontos', 'maximo', 'detalhe']);
     assert.deepEqual(Object.keys(nota.criterios.cabe_mais_um), ['pontos', 'maximo', 'detalhe']);
     assert.deepEqual(Object.keys(nota.criterios.alguem_paga), ['pontos', 'maximo', 'detalhe']);
     assert.deepEqual(Object.keys(nota.criterios.alcance), ['pontos', 'maximo', 'detalhe']);
+    assert.deepEqual(Object.keys(nota.veredito), ['decisao', 'faixa', 'explicacao']);
+    assert.equal(typeof nota.veredito.decisao, 'string');
+    assert.equal(typeof nota.veredito.faixa, 'string');
+    assert.equal(typeof nota.veredito.explicacao, 'string');
+    assert.notEqual(nota.veredito.explicacao.trim(), '');
 
     for (const criterio of Object.values(nota.criterios)) {
       assert.equal(typeof criterio.pontos, 'number');

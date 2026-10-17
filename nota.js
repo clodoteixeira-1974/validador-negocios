@@ -190,6 +190,42 @@ function avaliarAlcance(evidencias) {
   );
 }
 
+// Deriva o veredito a partir da nota. É a etapa que transforma a régua em
+// decisão, com os três desfechos previstos no fluxograma.
+//
+// As faixas são calculadas a partir de maximoPossivel, e não fixas no código:
+// a faixa de PARAR cobre os 20% menores da escala e a de SEGUIR os 40%
+// maiores. Com os cinco critérios atuais isso dá exatamente 0-1, 2-3 e 4-5,
+// que são as faixas definidas pelo Product Owner.
+function derivarVeredito(total, maximoPossivel) {
+  const maximo = Number.isFinite(maximoPossivel) && maximoPossivel > 0 ? maximoPossivel : 5;
+
+  const limiteParar = Math.round(maximo / 5);
+  const limiteSeguir = Math.round((3 * maximo) / 5);
+
+  if (total <= limiteParar) {
+    return {
+      decisao: 'PARAR',
+      faixa: `0 a ${limiteParar}`,
+      explicacao: 'Sem informacao suficiente. Nao vale seguir.'
+    };
+  }
+
+  if (total > limiteSeguir) {
+    return {
+      decisao: 'SEGUIR',
+      faixa: `${limiteSeguir + 1} a ${maximo}`,
+      explicacao: 'Vale gastar as proximas 24h testando com gente de verdade.'
+    };
+  }
+
+  return {
+    decisao: 'MUDAR_O_RECORTE',
+    faixa: `${limiteParar + 1} a ${limiteSeguir}`,
+    explicacao: 'Existe sinal, mas o publico ou a oferta precisa ser ajustada.'
+  };
+}
+
 // Lista os critérios implementados, na ordem da régua. Para acrescentar um
 // critério novo, basta declarar a função avaliadora e incluí-la aqui.
 const CRITERIOS = [
@@ -219,12 +255,14 @@ function calcularNota(evidencias) {
   return {
     criterios,
     total,
-    maximo_possivel: maximoPossivel
+    maximo_possivel: maximoPossivel,
+    veredito: derivarVeredito(total, maximoPossivel)
   };
 }
 
 module.exports = {
   calcularNota,
+  derivarVeredito,
   MINIMO_CONCORRENTES,
   PONTOS_TEM_GENTE,
   MINIMO_RECLAMACOES,

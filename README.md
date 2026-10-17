@@ -42,8 +42,21 @@ implementados**:
 - **"Você alcança essas pessoas?"** — concede 1 ponto quando há pelo menos uma evidência de
   alcance, ou seja, um caminho conhecido para chegar ao público-alvo.
 
-A régua está completa. Por enquanto a nota é geral, ou seja, considera todas as evidências
-guardadas, sem distinguir uma ideia da outra.
+A régua está completa, e cada nota vem acompanhada de um veredito. Por enquanto a nota é
+geral, ou seja, considera todas as evidências guardadas, sem distinguir uma ideia da outra.
+
+## Os três vereditos
+
+A nota vai de 0 a 5 e é traduzida em uma decisão, com faixas conservadoras:
+
+| Nota   | Veredito          | O que significa                                                       |
+| ------ | ----------------- | --------------------------------------------------------------------- |
+| 0 a 1  | `PARAR`           | Sem informação suficiente. Não vale seguir.                            |
+| 2 a 3  | `MUDAR_O_RECORTE` | Existe sinal, mas o público ou a oferta precisa ser ajustada.          |
+| 4 a 5  | `SEGUIR`          | Vale gastar as próximas 24h testando com gente de verdade.             |
+
+As faixas são deliberadamente conservadoras: com 5 pontos de máximo, só "SEGUIR" exige
+quase tudo certo, e um único sinal isolado ainda leva a `PARAR`.
 
 O projeto foi construído em etapas pequenas, cada uma com testes automatizados e um
 relatório em `relatorios/` explicando o que foi feito e por quê.
@@ -70,7 +83,7 @@ Para rodar os testes:
 npm test
 ```
 
-São 62 testes automatizados, todos passando.
+São 66 testes automatizados, todos passando.
 
 Dois exemplos de chamada:
 
@@ -172,25 +185,31 @@ Um exemplo de resposta de `/nota`, com três concorrentes e duas reclamações r
     }
   },
   "total": 5,
-  "maximo_possivel": 5
+  "maximo_possivel": 5,
+  "veredito": {
+    "decisao": "SEGUIR",
+    "faixa": "4 a 5",
+    "explicacao": "Vale gastar as proximas 24h testando com gente de verdade."
+  }
 }
 ```
 
 Cada critério traz três coisas: os pontos que concedeu, o máximo que poderia conceder e um
 texto explicando como chegou ao resultado. O `total` é a soma dos pontos e o
 `maximo_possivel` é a soma dos máximos. Com os cinco critérios implementados, a escala vai de
-0 a 5 e está fechada: `maximo_possivel` não muda mais.
+0 a 5 e está fechada: `maximo_possivel` não muda mais. O `veredito` traduz essa nota em uma
+decisão, e é descrito na seção seguinte.
 
 ## Estrutura do projeto
 
 | Arquivo                             | Função                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `server.js`                         | O serviço. Recebe requisições, valida, classifica, grava e devolve as respostas.                         |
-| `server.test.js`                    | 30 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
+| `server.test.js`                    | 32 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
 | `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações, dados de mercado, monetização e alcance. |
 | `evidencias.test.js`                | 11 testes do módulo de evidências, também com arquivos temporários.                                      |
-| `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua às evidências registradas.                    |
-| `nota.test.js`                      | 21 testes do cálculo da nota, sem HTTP e sem disco.                                                       |
+| `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua e deriva o veredito.                           |
+| `nota.test.js`                      | 23 testes do cálculo da nota e do veredito, sem HTTP e sem disco.                                          |
 | `testar-evidencias.js`              | Script de verificação manual do módulo de evidências.                                                     |
 | `package.json`                      | Nome do projeto e os comandos `start` e `test`.                                                          |
 | `validacoes.jsonl`                  | Registro das validações recebidas (gerado em execução, não versionado).                                  |
@@ -208,18 +227,17 @@ nativo do Node.js.
 ## Estado do projeto
 
 Fase avançada: o serviço de validação e classificação está funcionando, as rotas de
-evidências estão integradas ao servidor, e **a régua está completa**: os cinco critérios
-calculam a nota a partir das evidências registradas. São 62 testes automatizados, todos
-passando.
+evidências estão integradas ao servidor, a régua está completa com os cinco critérios, e
+cada nota vem com um veredito que traduz a pontuação em decisão. São 66 testes automatizados,
+todos passando.
 
-O que ainda falta: derivar o veredito a partir da nota, coletar concorrentes e reclamações de
-verdade, e só então gerar o relatório final.
+O que ainda falta: coletar concorrentes e reclamações de verdade, gerar o relatório final em
+PDF, e publicar o serviço.
 
 ## Próximos passos
 
-- Derivar o veredito a partir da nota (parar, mudar o recorte ou seguir)
-- Coletar concorrentes reais e extrair reclamações de usuários
 - Gerar relatório final em PDF
+- Coletar concorrentes reais e extrair reclamações de usuários
 - Interface web e publicação do serviço
 - Coletar concorrentes reais e extrair reclamações de usuários
 - Integrar um modelo de linguagem e busca semântica (RAG)

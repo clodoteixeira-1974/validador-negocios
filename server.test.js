@@ -383,7 +383,12 @@ test('GET /nota com arquivo de evidencias vazio: 200 com total 0', async () => {
         }
       },
       total: 0,
-      maximo_possivel: 5
+      maximo_possivel: 5,
+      veredito: {
+        decisao: 'PARAR',
+        faixa: '0 a 1',
+        explicacao: 'Sem informacao suficiente. Nao vale seguir.'
+      }
     });
   });
 });
@@ -580,6 +585,52 @@ test('GET /nota com um registro de cada tipo: a regua completa vale 5 de 5', asy
     }
 
     assert.equal(Object.keys(r.corpo.criterios).length, 5);
+
+    // Regua completa: o veredito manda seguir.
+    assert.equal(r.corpo.veredito.decisao, 'SEGUIR');
+    assert.equal(r.corpo.veredito.faixa, '4 a 5');
+    assert.notEqual(r.corpo.veredito.explicacao.trim(), '');
+  });
+});
+
+test('GET /nota com nota 3: veredito manda mudar o recorte', async () => {
+  await comServidor(async ({ base }) => {
+    // 3 concorrentes satisfazem "tem gente?" e "cabe mais um?".
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A' }));
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B' }));
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente C' }));
+
+    // Uma reclamação satisfaz "tem gente insatisfeita?".
+    await postEvidencia(base, evidenciaValida({ tipo: 'reclamacao', fonte: 'Reclamacao X' }));
+
+    const r = await getNota(base);
+
+    assert.equal(r.status, 200);
+    assert.equal(r.corpo.total, 3);
+    assert.equal(r.corpo.maximo_possivel, 5);
+
+    assert.equal(r.corpo.veredito.decisao, 'MUDAR_O_RECORTE');
+    assert.equal(r.corpo.veredito.faixa, '2 a 3');
+    assert.equal(
+      r.corpo.veredito.explicacao,
+      'Existe sinal, mas o publico ou a oferta precisa ser ajustada.'
+    );
+  });
+});
+
+test('GET /nota com 1 reclamacao e sem concorrentes: total 1 e veredito PARAR', async () => {
+  await comServidor(async ({ base }) => {
+    await postEvidencia(base, evidenciaValida({ tipo: 'reclamacao', fonte: 'Reclamacao X' }));
+
+    const r = await getNota(base);
+
+    assert.equal(r.status, 200);
+    assert.equal(r.corpo.total, 1);
+    assert.equal(r.corpo.criterios.tem_gente_insatisfeita.pontos, 1);
+
+    // Um único sinal não basta para seguir.
+    assert.equal(r.corpo.veredito.decisao, 'PARAR');
+    assert.equal(r.corpo.veredito.faixa, '0 a 1');
   });
 });
 
