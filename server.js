@@ -20,8 +20,12 @@ const SERVICO = 'validador-negocios';
 // Arquivo de persistência (JSON Lines), na mesma pasta do server.js
 const ARQUIVO_VALIDACOES = path.join(__dirname, 'validacoes.jsonl');
 
-// Palavras que classificam a ideia como mobile
-const PALAVRAS_MOBILE = ['app', 'aplicativo'];
+// Palavras que classificam a ideia como mobile. A comparação usa limite de
+// palavra (\b) de propósito: sem ele, qualquer palavra que contenha "app" —
+// "pineapple", "happy", "Snapple" — seria classificada como aplicativo.
+// Com \b, "AppStore" e "Application" também ficam de fora, porque "app" não
+// aparece neles como palavra isolada.
+const PADRAO_MOBILE = /\b(app|aplicativo)\b/i;
 
 // Campos que o cliente pode enviar em POST /evidencias.
 // id e timestamp nao entram aqui: sao gerados pelo modulo evidencias.js.
@@ -30,9 +34,7 @@ const CAMPOS_EVIDENCIA = ['tipo', 'fonte', 'url', 'trecho_bruto', 'ideia_relacio
 
 // Regra única de classificação
 function classificarTipo(ideia) {
-  const texto = ideia.toLowerCase();
-  const ehMobile = PALAVRAS_MOBILE.some((palavra) => texto.includes(palavra));
-  return ehMobile ? 'mobile' : 'outro';
+  return PADRAO_MOBILE.test(String(ideia)) ? 'mobile' : 'outro';
 }
 
 // Valida o corpo da requisição. Devolve { ok, status, erro } ou { ok, ideia }.
@@ -281,6 +283,6 @@ module.exports = {
   PORTA_PADRAO,
   LIMITE_CORPO,
   SERVICO,
-  PALAVRAS_MOBILE,
+  PADRAO_MOBILE,
   CAMPOS_EVIDENCIA
 };

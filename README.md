@@ -13,8 +13,10 @@ Hoje, o serviço faz quatro coisas:
 
 1. **Valida a ideia.** Você envia uma ideia em texto. O servidor confere se o pedido está
    bem formado e devolve uma resposta clara, seja aceito ou recusado.
-2. **Classifica o tipo.** Se a ideia menciona "app" ou "aplicativo", ela é classificada
-   como `mobile`. Caso contrário, como `outro`.
+2. **Classifica o tipo.** Se a ideia menciona "app" ou "aplicativo" como palavra isolada,
+   ela é classificada como `mobile`. Caso contrário, como `outro`. A comparação usa limite de
+   palavra, então "pineapple", "happy" e "AppStore" continuam sendo `outro`, porque nelas
+   "app" não é uma palavra separada.
 3. **Guarda evidências de mercado.** É possível registrar concorrentes, reclamações de
    usuários e dados de setor, e depois listar tudo o que foi registrado.
 4. **Dá uma nota de viabilidade.** A nota é calculada a partir das evidências registradas,
@@ -106,7 +108,7 @@ Para rodar os testes:
 npm test
 ```
 
-São 86 testes automatizados, todos passando.
+São 88 testes automatizados, todos passando.
 
 Dois exemplos de chamada:
 
@@ -253,7 +255,7 @@ decisão, e é descrito na seção seguinte.
 | Arquivo                             | Função                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `server.js`                         | O serviço. Recebe requisições, valida, classifica, grava e devolve as respostas.                         |
-| `server.test.js`                    | 44 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
+| `server.test.js`                    | 46 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
 | `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações, dados de mercado, monetização e alcance. |
 | `evidencias.test.js`                | 19 testes do módulo de evidências, também com arquivos temporários.                                      |
 | `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua e deriva o veredito.                           |
@@ -280,7 +282,7 @@ Fase avançada: o serviço de validação e classificação está funcionando, a
 completa com os cinco critérios, cada nota vem com um veredito, e a nota é **por ideia**:
 as evidências se vinculam ao identificador da validação, e o relatório mostra a nota
 correta daquela ideia. Há um dashboard em HTML que gera um relatório A4 com link para
-compartilhar. São 86 testes automatizados, todos passando.
+compartilhar. São 88 testes automatizados, todos passando.
 
 O que ainda falta: coletar concorrentes e reclamações de verdade, e publicar o serviço.
 

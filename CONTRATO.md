@@ -51,6 +51,11 @@ Gravada em `evidencias.jsonl`. É o dado que a régua consome.
 Valores aceitos em `tipo`: `concorrente`, `reclamacao`, `dado_mercado`, `monetizacao`,
 `alcance`.
 
+O `tipo` da **Validação** é outro campo, com dois valores: `mobile` e `outro`. Ele é
+calculado por limite de palavra, e vale `mobile` quando a ideia contém `app` ou `aplicativo`
+como **palavra isolada**. "Pineapple shop", "happy" e "AppStore" resultam em `outro`. A
+regra é determinística e não é ajustável pela API.
+
 Valores aceitos em `relevancia`: `alta`, `media`, `baixa`. O campo é validado e gravado, e
 **não influencia a nota** — decisão do PO na Tarefa 13, mantida.
 

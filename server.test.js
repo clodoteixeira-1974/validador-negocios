@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { createApp, ARQUIVO_VALIDACOES, ARQUIVO_EVIDENCIAS } = require('./server');
+const { createApp, classificarTipo, ARQUIVO_VALIDACOES, ARQUIVO_EVIDENCIAS } = require('./server');
 
 // Cada teste sobe o servidor em uma porta efêmera (listen(0)) e grava em arquivos
 // temporários. Os .jsonl de produção nunca são tocados.
@@ -259,6 +259,54 @@ test('POST /saude: 405 com header Allow: GET', async () => {
     assert.equal(resposta.status, 405);
     assert.equal(resposta.headers.get('allow'), 'GET');
     assert.deepEqual(corpo, { error: 'Metodo nao permitido', permitido: 'GET' });
+  });
+});
+
+test('classificarTipo usa limite de palavra e não casa dentro de outras palavras', async () => {
+  // Estas são as asserções que a auditoria Red Team pediu e que falhavam
+  // antes do fix-06.
+  const casos = [
+    // Palavras isoladas continuam classificando como mobile.
+    { ideia: 'App para controlar gastos', esperado: 'mobile' },
+    { ideia: 'Aplicativo de receitas', esperado: 'mobile' },
+    { ideia: 'APP', esperado: 'mobile' },
+    { ideia: 'app', esperado: 'mobile' },
+    { ideia: 'APLICATIVO', esperado: 'mobile' },
+    { ideia: 'Aplicativo', esperado: 'mobile' },
+    { ideia: 'meu app de receitas', esperado: 'mobile' },
+    { ideia: 'aplicativo-web de banco', esperado: 'mobile' },
+
+    // "app" dentro de outra palavra não é mais aplicativo. Estes quatro
+    // casos davam "mobile" por causa do includes().
+    { ideia: 'Pineapple shop', esperado: 'outro' },
+    { ideia: 'pineapple', esperado: 'outro' },
+    { ideia: 'happy', esperado: 'outro' },
+    { ideia: 'Snapple', esperado: 'outro' },
+    { ideia: 'Application development', esperado: 'outro' },
+    { ideia: 'AppStore', esperado: 'outro' },
+
+    // Ideias sem nenhuma das palavras.
+    { ideia: 'Consultoria de marketing', esperado: 'outro' },
+    { ideia: 'cooperativa', esperado: 'outro' },
+    { ideia: '', esperado: 'outro' }
+  ];
+
+  for (const caso of casos) {
+    assert.equal(classificarTipo(caso.ideia), caso.esperado, JSON.stringify(caso.ideia));
+  }
+});
+
+test('classificação corrigida é o que o POST /validar-ideia devolve e grava', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    const falsoPositivo = await post(base, { ideia: 'Pineapple shop' });
+    const verdadeiro = await post(base, { ideia: 'App para controlar gastos' });
+
+    assert.equal(falsoPositivo.corpo.tipo, 'outro');
+    assert.equal(verdadeiro.corpo.tipo, 'mobile');
+
+    // E o que foi gravado no arquivo é o mesmo que foi respondido.
+    const tipos = lerLinhas(arquivo).map((linha) => JSON.parse(linha).tipo);
+    assert.deepEqual(tipos, ['outro', 'mobile']);
   });
 });
 

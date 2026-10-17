@@ -57,6 +57,10 @@ nota por ideia e link de compartilhamento. Falta o dado real.
 - [Baixa] Integração com LLM e RAG
 - [Baixa] Relatório que compare mais de uma validação
 - [Baixa] Backup dos dados de execução e `.env`
+- [Baixa] Classificação de tipo ainda é por palavra-chave. O limite de palavra corrigiu o falso
+  positivo de "pineapple" e "AppStore", mas a regra só reconhece `app` e `aplicativo`. Uma
+  ideia de "aplicação" ou "aplicativo mobile" escrita de outra forma continua classificada
+  como `outro`. A classificação não é algo que a IA vá refinar no `nota.js`
 
 ### Decisões tomadas
 
@@ -178,14 +182,15 @@ dados de verdade e o relatório final ainda não existem.
   `detalhe`; `total` e `maximo_possivel` são somas. A escala está fechada em 0 a 5
 - Cinco tipos de evidência aceitos: `concorrente`, `reclamacao`, `dado_mercado`,
   `monetizacao` e `alcance`. Os dois últimos foram criados para o quarto e o quinto critério
-- Classificação mobile/outro (palavras-chave `app`, `aplicativo`)
+- Classificação mobile/outro por limite de palavra: `app` e `aplicativo` só valem como
+  palavra isolada. "Pineapple shop", "happy" e "AppStore" são `outro`
 - Persistência em `validacoes.jsonl` e `evidencias.jsonl`
 - Módulo `evidencias.js`, com caminho de arquivo injetável para que os testes não toquem
   os dados de produção
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 86 testes automatizados (44 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
+- 88 testes automatizados (46 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
   `nota.test.js`)
 - **Leitura de `.jsonl` resiliente e unificada**: `validacoes.jsonl` e `evidencias.jsonl` são
   lidos pela mesma função, em `jsonl.js`. Linha corrompida é ignorada com aviso em
@@ -234,7 +239,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 
 - Servidor: não está rodando. Para iniciar: `npm start`
 - Porta padrão: 3000 (configurável via `PORT`)
-- Testes: `npm test` (86 passando)
+- Testes: `npm test` (88 passando)
 - Repositório GitHub: https://github.com/clodoteixeira-1974/validador-negocios
 - Branch principal: `main`
 
@@ -243,7 +248,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 86 testes automatizados
+npm test        # roda os 88 testes automatizados
 ```
 
 Exemplos de chamada:
