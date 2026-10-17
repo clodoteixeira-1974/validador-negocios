@@ -57,6 +57,9 @@ real, e as rotas de escrita continuam sem autenticação, apesar do limite de ta
 - fix-12: modelo de visão padrão do OpenRouter trocado para `openai/gpt-5.6-luna`
 - fix-13: chamada real confirmou OCR do Luna com PNG válido; rota HTTP e relatório A4
   validados ponta a ponta; erros genéricos do OpenRouter agora expõem a causa interna
+- Tarefa 22: validação da ideia de gestão de campanhas eleitorais com cinco evidências
+  vinculadas, nota e relatório A4; as fontes e afirmações foram fornecidas pelo PO e não
+  verificadas independentemente nesta execução
 
 ### Decisões do PO sobre acesso e apresentação
 
@@ -76,7 +79,8 @@ só, e nenhum placeholder chegou ao HTML.
 - [Média] Limite de taxa **compartilhado entre instâncias**. O limite existe por
   processo, em memória, então com duas instâncias atrás de balanceador o teto efetivo
   dobra. E atrás de proxy, sem `trust proxy`, todo mundo cai no mesmo balde do proxy
-- [Alta] Coleta real de concorrentes e reclamações
+- [Alta] Verificar independentemente as fontes e afirmações das evidências registradas na
+  Tarefa 22; os trechos recebidos do PO foram inseridos como fornecidos, sem validação externa
 - [Alta] Vínculo automático entre ideia e evidência na hora de coletar
 - [Média] Autenticação ou revogação de link. A expiração de 30 dias fecha o relatório, a nota por
   ideia e as evidências vinculadas, mas não dá revogação antes do prazo
@@ -367,9 +371,8 @@ Para usar outra porta: `PORT=8080 npm start` (Linux/macOS) ou
 
 ## Próximo passo
 
-**Tarefa 22 — coletar concorrentes e reclamações de verdade**, com o `id` da validação como
-entrada obrigatória, para que toda evidência coletada já nasça vinculada a uma ideia. Definir
-fontes, frequência de coleta e validação humana antes de incorporar evidências ao relatório.
+**Revisão humana das evidências da Tarefa 22**: conferir as fontes e afirmações registradas para
+a ideia de gestão de campanhas eleitorais; depois, definir com o PO o próximo item do backlog.
 
 ## Pendências conhecidas
 
