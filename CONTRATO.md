@@ -71,23 +71,46 @@ valer. Um relatório expirado continua no arquivo, e a nota dele continua existi
 
 ### Onde a expiração é verificada
 
-A expiração vale para **duas** rotas, e vale para o **dado**, não só para a página:
+A expiração vale para **todas as rotas que aceitam um id de validação**, e vale para o
+**dado**, não só para a página:
 
-| Rota | Com expiração vencida |
+| Rota | Validação inexistente | Validação expirada |
+| --- | --- | --- |
+| `GET /relatorio/:id` | `404`, HTML de não encontrado | `410`, HTML de link expirado |
+| `GET /nota?id=<id>` | segue `200`, com nota zero | `410`, com `{"error": "Este link expirou"}` |
+| `GET /evidencias?id=<id>` | `404`, com `{"error": "Validacao nao encontrada"}` | `410`, com `{"error": "Este link expirou"}` |
+
+As duas rotas sem filtro não têm prazo, e a razão é a mesma nas duas: elas não pertencem a
+uma validação, então não têm `expires_at` de onde tirar um prazo.
+
+| Rota | Comportamento |
 | --- | --- |
-| `GET /relatorio/:id` | `410`, com HTML de link expirado |
-| `GET /nota?id=<id>` | `410`, com `{"error": "Este link expirou"}` |
 | `GET /nota` (sem `?id=`) | segue `200`: a nota geral não pertence a uma validação |
+| `GET /evidencias` (sem `?id=`) | segue `200`: a listagem global não pertence a uma validação |
 
-A verificação em `/nota?id=` foi adicionada depois de uma constatação honesta: fechar só a
-página do relatório deixava o mesmo dado acessível por outra rota. Quem tivesse o `id`
-continuaria lendo a nota depois do prazo, o que faz da expiração uma medida de
-**aparência** — a página some, a informação não.
+**A regra que vale é uma só: onde o dado é servido, o prazo é conferido.** Fechar apenas a
+página do relatório deixava o mesmo dado acessível por outra rota, e a expiração virava
+medida de **aparência** — a tela some, a informação fica. Por isso `/nota?id=` foi fechada
+no fix-08 e `/evidencias?id=` no fix-09, e não por acaso: cada uma delas era um caminho
+restante para o mesmo dado depois do prazo.
 
-Por isso a expiração precisa ser conferida onde o dado é servido, e não apenas onde ele é
-mostrado. A nota geral fica de fora de propósito: ela agrega evidências sem vínculo e não
-tem `expires_at` de onde tirar um prazo.
+### `GET /evidencias?id=` mudou de contrato
 
+Essa rota agora **exige que a validação exista**. Antes, qualquer string servia de filtro:
+um `id` inexistente devolvia `200` com lista vazia. A partir do fix-09:
+
+- `?id=` de uma validação que não existe devolve `404` com `{"error": "Validacao nao
+  encontrada"}`;
+- `?id=` de uma validação expirada devolve `410` com `{"error": "Este link expirou"}`;
+- `?id=` de uma validação válida segue `200` com as evidências vinculadas.
+
+A mudança é de contrato, e vale registrar por quê vale a pena: `200` com lista vazia era
+**ambíguo**. Não dava para distinguir "não há evidência para esta ideia" de "este id não
+existe", e o segundo caso é justamente o que a expiração precisa distinguir de "expirou".
+
+Consequência para quem integra: um `id_validacao` guardado sem a validação correspondente
+agora devolve `404`. Evidência sem vínculo continua existindo e continua contando na nota
+geral — só o filtro por `id` mudou.
 ### Compatibilidade com validações antigas
 
 Validações gravadas antes da Tarefa 25 **não têm `expires_at`**. Elas são tratadas como
@@ -264,15 +287,14 @@ sumiram. **Não existe** detecção de perda, reparo nem cópia de segurança �
 - **`ideia_relacionada` é texto livre e não é validado contra a Validação.** Uma evidência
   vinculada a um `id_validacao` pode trazer um texto de ideia completamente diferente, e o
   sistema aceita.
-- **A expiração é só do link de leitura.** `expires_at` é gravado junto do registro, e a
-  verificação acontece em `GET /relatorio/:id` e em `GET /nota?id=`. Ela **não** apaga nada:
-  uma validação expirada continua no arquivo, continua contando como evidência válida por
-  `id_validacao` para as notas de outras ideias, e continua sendo aceito como vínculo em
-  `POST /evidencias`.
-- **`GET /evidencias?id=` não verifica expiração.** Ele devolve a lista de evidências
-  vinculadas a um `id`, e essa rota segue aberta depois do prazo. Quem já tem o `id` ainda
-  consegue ler as evidências cruas. Fechá-la é a próxima pendência natural, e ela não foi
-  fechada aqui porque muda o contrato de `GET /evidencias` sem que a tarefa a tenha pedido.
+- **A expiração vale nas três rotas que aceitam `id` de validação**: `GET /relatorio/:id`,
+  `GET /nota?id=` e `GET /evidencias?id=`. Ela **não** apaga nada: uma validação expirada
+  continua no arquivo, continua contando como evidência válida por `id_validacao` para as
+  notas de outras ideias, e continua sendo aceito como vínculo em `POST /evidencias`.
+- **Expirar não impede mais de registrar evidência.** `POST /evidencias` aceita
+  `id_validacao` de uma validação expirada, e essa evidência continua contando na nota de
+  outras ideias. Fechar a leitura do prazo e manter a escrita aberta é assimétrico por
+  escolha: escrita aberta é decisão do PO, e nenhuma tarefa desta série mexeu nela.
 - **Validação antiga continua válida e continua sem prazo.** Documentado acima, e aceito
   como dívida: o campo não existe nelas e nada foi inventado para preenchê-lo.
 - **O rodapé do dashboard e o do relatório não têm o mesmo conteúdo.** O do dashboard é

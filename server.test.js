@@ -1004,8 +1004,13 @@ test('arquivo de validacoes corrompido não impede o relatório das validações
 
 test('arquivo de evidencias corrompido não derruba /nota nem /evidencias', async () => {
   await comServidor(async ({ base, arquivoEvidencias }) => {
-    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A', id_validacao: 'v1' }));
-    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B', id_validacao: 'v1' }));
+    // A validação precisa existir: desde o fix-09, /evidencias?id= devolve 404 para
+    // id que não corresponde a nenhuma validação, e o 200 com lista vazia saiu de uso.
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+    const id = validacao.corpo.id;
+
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A', id_validacao: id }));
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B', id_validacao: id }));
 
     // Corrompe uma linha no meio das duas.
     const linhas = fs.readFileSync(arquivoEvidencias, 'utf8').split('\n');
@@ -1023,11 +1028,13 @@ test('arquivo de evidencias corrompido não derruba /nota nem /evidencias', asyn
     assert.equal(nota.corpo.total, 0);
     assert.equal(nota.corpo.criterios.tem_gente.detalhe, '1 concorrente registrado. Minimo: 2.');
 
-    // E o filtro por id também funciona com o arquivo pela metade.
-    const filtrada = await fetch(`${base}/evidencias?id=v1`);
+    // E o filtro por id também funciona com o arquivo pela metade: sobra a linha boa
+    // da mesma validação, e a corrompida é ignorada.
+    const filtrada = await fetch(`${base}/evidencias?id=${encodeURIComponent(id)}`);
     const corpoFiltrado = await filtrada.json();
     assert.equal(filtrada.status, 200);
     assert.equal(corpoFiltrado.total, 1);
+    assert.equal(corpoFiltrado.evidencias[0].fonte, 'Concorrente B');
   });
 });
 
@@ -1343,7 +1350,7 @@ test('GET /nota sem ?id= continua devolvendo a nota geral, sem expiracao', async
     const validacao = await post(base, { ideia: 'App para controlar gastos' });
 
     // Todas as validacoes deste teste estao expiradas, e a nota geral continua
-    // de pé: ela nao pertence a uma validacao, entao nao tem prazo.
+    // de pe: ela nao pertence a uma validacao, entao nao tem prazo.
     definirExpiracao(arquivo, validacao.corpo.id, new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
     await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A' }));
 
@@ -1353,5 +1360,79 @@ test('GET /nota sem ?id= continua devolvendo a nota geral, sem expiracao', async
     assert.equal(resposta.status, 200);
     assert.equal(typeof corpo.total, 'number');
     assert.equal(typeof corpo.maximo_possivel, 'number');
+  });
+});
+
+test('GET /evidencias?id= com id valido e nao expirado devolve 200 com as evidencias', async () => {
+  await comServidor(async ({ base }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+    const id = validacao.corpo.id;
+
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A', id_validacao: id }));
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B', id_validacao: id }));
+
+    const resposta = await fetch(`${base}/evidencias?id=${encodeURIComponent(id)}`);
+    const corpo = await resposta.json();
+
+    assert.equal(resposta.status, 200);
+    assert.equal(corpo.total, 2);
+    assert.deepEqual(
+      corpo.evidencias.map((evidencia) => evidencia.fonte),
+      ['Concorrente A', 'Concorrente B']
+    );
+  });
+});
+
+test('GET /evidencias?id= com id expirado devolve 410 e nao vaza as evidencias', async () => {
+  await comServidor(async ({ base, arquivo, arquivoEvidencias }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+    const id = validacao.corpo.id;
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A', id_validacao: id }));
+
+    definirExpiracao(arquivo, id, new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+    const resposta = await fetch(`${base}/evidencias?id=${encodeURIComponent(id)}`);
+    const corpo = await resposta.json();
+
+    assert.equal(resposta.status, 410);
+    assert.match(resposta.headers.get('content-type') || '', /json/);
+    assert.deepEqual(corpo, { error: 'Este link expirou' });
+
+    // O corpo do erro nao pode carregar nem um trecho da evidencia.
+    assert.equal(corpo.evidencias, undefined);
+    assert.equal(corpo.total, undefined);
+
+    // Expirar fecha o acesso, e nao apaga o dado.
+    assert.equal(lerLinhas(arquivoEvidencias).length, 1);
+  });
+});
+
+test('GET /evidencias?id= com id inexistente devolve 404, e nao lista vazia', async () => {
+  await comServidor(async ({ base }) => {
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A', id_validacao: 'v1' }));
+
+    const resposta = await fetch(`${base}/evidencias?id=${encodeURIComponent(gerarId())}`);
+    const corpo = await resposta.json();
+
+    // Antes, um id inexistente devolvia 200 com zero evidencias, e isso indistinguia
+    // "nao ha evidencia para este id" de "este id nao existe".
+    assert.equal(resposta.status, 404);
+    assert.deepEqual(corpo, { error: 'Validacao nao encontrada' });
+  });
+});
+
+test('GET /evidencias sem ?id= continua listando todas, mesmo com validacoes expiradas', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A' }));
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B' }));
+
+    definirExpiracao(arquivo, validacao.corpo.id, new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+    const resposta = await fetch(`${base}/evidencias`);
+    const corpo = await resposta.json();
+
+    assert.equal(resposta.status, 200);
+    assert.equal(corpo.total, 2, 'a listagem global nao tem prazo');
   });
 });

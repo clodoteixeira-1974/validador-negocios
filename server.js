@@ -221,6 +221,25 @@ function linkExpirado(validacao, agora = Date.now()) {
 // devolve todas e a nota e a geral.
   app.get('/evidencias', (req, res) => {
     const filtro = typeof req.query.id === 'string' ? req.query.id : undefined;
+
+    // Com ?id=, o filtro so funciona para uma validacao que existe e nao expirou.
+    // Sem essa checagem, este era o ultimo caminho de leitura que aceitava um id de
+    // validacao depois do prazo: o relatorio e a nota fechavam, e as evidencias cruas
+    // continuavam saindo.
+    if (filtro !== undefined) {
+      const validacao = buscarValidacao(filtro, arquivoValidacoes);
+
+      // 404 e nao lista vazia: antes, um id inexistente devolvia 200 com zero
+      // evidencias, e isso indistinguia "nao ha evidencia" de "esse id nao existe".
+      if (!validacao) {
+        return res.status(404).json({ error: 'Validacao nao encontrada' });
+      }
+
+      if (linkExpirado(validacao)) {
+        return res.status(410).json({ error: 'Este link expirou' });
+      }
+    }
+
     const evidencias = listarEvidencias(arquivoEvidencias, filtro);
     return res.json({ total: evidencias.length, evidencias });
   });

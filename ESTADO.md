@@ -71,11 +71,8 @@ só, e nenhum placeholder chegou ao HTML.
   público e sem limite, um laço de escrita enche o disco, e o I/O é síncrono
 - [Alta] Coleta real de concorrentes e reclamações
 - [Alta] Vínculo automático entre ideia e evidência na hora de coletar
-- [Média] Autenticação ou revogação de link. A expiração de 30 dias fecha o relatório e a
-  nota por ideia, mas não dá revogação antes do prazo, e `GET /evidencias?id=` continua
-  listando as evidências depois dele
-- [Média] Expiração também em `GET /evidencias?id=`, que é a última rota de leitura que
-  aceita um `id` de validação e ainda não confere o prazo
+- [Média] Autenticação ou revogação de link. A expiração de 30 dias fecha o relatório, a nota por
+  ideia e as evidências vinculadas, mas não dá revogação antes do prazo
 - [Média] Extração de reclamações
 - [Média] Detecção de perda e reparo de linha corrompida. A leitura já é resiliente e a
   linha ruim é ignorada com aviso, mas ela **continua no arquivo** e não existe caminho para
@@ -225,7 +222,7 @@ dados de verdade e o relatório final ainda não existem.
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 101 testes automatizados (59 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
+- 105 testes automatizados (63 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
   `nota.test.js`)
 - **Leitura de `.jsonl` resiliente e unificada**: `validacoes.jsonl` e `evidencias.jsonl` são
   lidos pela mesma função, em `jsonl.js`. Linha corrompida é ignorada com aviso em
@@ -235,9 +232,12 @@ dados de verdade e o relatório final ainda não existem.
   criptográfica. O formato antigo, `<timestamp>-<6 caracteres>`, era adivinhável por força
   bruta. O `id` não é segredo: quem tem o link abre o relatório
 - **Expiração de link em 30 dias**: `expires_at` gravado com a validação, devolvido na
-  resposta, mostrado no rodapé do relatório e no dashboard. Vale para **duas** rotas:
-  `GET /relatorio/:id` devolve `410` em HTML, e `GET /nota?id=` devolve `410` em JSON com
-  `{"error": "Este link expirou"}`. A nota geral, sem `?id=`, não tem prazo
+  resposta, mostrado no rodapé do relatório e no dashboard. Vale para **todas as rotas que
+  aceitam um id de validação**: `GET /relatorio/:id` devolve `410` em HTML, `GET /nota?id=` e
+  `GET /evidencias?id=` devolvem `410` em JSON com `{"error": "Este link expirou"}`, e
+  `GET /evidencias?id=` ainda devolve `404` com `{"error": "Validacao nao encontrada"}` quando o
+  id não corresponde a nenhuma validação. As duas rotas sem filtro não têm prazo, porque não
+  pertencem a uma validação
 - **Compatibilidade com validação antiga**: as 6 validações anteriores à expiração não têm
   `expires_at` e **não expiram nunca**. Nada foi migrado, e o rodapé delas avisa que não há
   prazo. A escolha está justificada em `CONTRATO.md`
@@ -314,7 +314,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 101 testes automatizados
+npm test        # roda os 105 testes automatizados
 ```
 
 Exemplos de chamada:
@@ -349,10 +349,9 @@ loop, porque o I/O é síncrono. Aviso não protege ninguém disso.
 A ordem faz sentido porque limite de taxa é o que torna a publicação segura sem
 autenticação. Sem ele, "público" significa "disponível para ser derrubado".
 
-**Antes disso, uma escolha de escopo que o PO pode querer revisar:** a expiração fecha o
-relatório e a nota por ideia, mas não `GET /evidencias?id=`, que é a última rota de leitura
-aceitando um `id` de validação. Fechá-la é a mesma lógica desta tarefa aplicada a mais uma
-rota, e muda o contrato de `GET /evidencias`.
+**O PO já decidiu sobre essa brecha.** Ele aprovou o fechamento de `GET /evidencias?id=`,
+e é o que o fix-09 fez. A expiração agora cobre as três rotas que aceitam `id` de
+validação, e não existe leitura de dado de validação que escape do prazo.
 
 Depois, a Tarefa 22 segue na fila: coletar concorrentes e reclamações de verdade, com o `id`
 da validação como entrada obrigatória. As perguntas de produto e de conduta continuam as
@@ -385,9 +384,10 @@ Permanecem em aberto, todas de ambiente ou de infraestrutura, nenhuma de código
   **fez o ataque por força bruta caro de tentar**, e o link agora expira em 30 dias, o que
   **limita a exposição de um link vazado**. Ainda assim **não é controle de acesso**: não há
   revogação, e quem tem o link tem o relatório enquanto ele valer.
-- **A expiração cobre o relatório e a nota por ideia, mas não `GET /evidencias?id=`.**
-  Quem souber o `id` ainda consegue listar as evidências cruas depois do prazo. Fechar essa rota é
-  a pendência natural seguinte, e ela muda o contrato de `GET /evidencias`.
+- **A expiração cobre as três rotas que aceitam id de validação**, desde o fix-09. A
+  brecha de `GET /evidencias?id=` está fechada, e a pendência saiu daqui. O que
+  continua assimétrico é o contrário: `POST /evidencias` continua aceitando
+  `id_validacao` de validação expirada, por decisão do PO.
 - **Validação antiga não expira nunca**, por decisão técnica documentada em `CONTRATO.md`.
   São 6 registros neste ambiente. O `id` em UUID v4 é o que impede a enumeração desses
   relatórios, e é por isso que a dívida foi aceita.

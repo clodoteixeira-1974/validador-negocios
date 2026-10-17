@@ -85,16 +85,25 @@ Cada validação recebe, na hora em que é criada, um `expires_at`: o instante 3
 frente, em ISO 8601. Ele volta na resposta de `POST /validar-ideia`, é gravado junto do
 registro e aparece no rodapé do relatório e no dashboard.
 
-`GET /relatorio/:id` compara essa data com o agora:
+A comparação dessa data com o agora acontece em **todas as rotas que aceitam um id de
+validação**. Não só onde o relatório é mostrado, mas onde o dado é servido:
 
-| Situação | Resposta |
-| --- | --- |
-| dentro do prazo | `200`, com o relatório |
-| prazo vencido | `410`, com uma página HTML dizendo que o link expirou |
-| validação antiga, sem `expires_at` | `200`, com o relatório |
+| Rota | Dentro do prazo | Prazo vencido | `id` inexistente |
+| --- | --- | --- | --- |
+| `GET /relatorio/:id` | `200`, relatório em HTML | `410`, página de expirado | `404`, HTML |
+| `GET /nota?id=` | `200`, com a nota | `410`, `{"error": "Este link expirou"}` | segue `200`, com nota zero |
+| `GET /evidencias?id=` | `200`, com as evidências | `410`, `{"error": "Este link expirou"}` | `404`, `{"error": "Validacao nao encontrada"}` |
+
+As duas rotas **sem** filtro não têm prazo: `GET /nota` e `GET /evidencias` sem `?id=` não
+pertencem a uma validação, então não têm `expires_at` de onde tirar um.
 
 O `410` e não `404` porque a validação continua existindo: o que deixou de valer foi o
-acesso ao relatório, e não a ideia. A diferença importa para quem consome a API.
+acesso, e não a ideia. A diferença importa para quem consome a API.
+
+O `404` em `/evidencias?id=` é uma mudança de contrato: antes, qualquer string servia de
+filtro e um id inexistente devolvia `200` com lista vazia. Isso era ambíguo, porque não
+dava para distinguir "não há evidência para esta ideia" de "este id não existe" — e é
+justamente essa distinção que a expiração precisa fazer.
 
 **O prazo é do link, não do documento.** Um relatório impresso ou salvo em PDF continua
 válido depois que o link expira.
@@ -122,7 +131,7 @@ O serviço é público, de portfólio, e é honesto sobre isso. O que está impl
 | Aviso de portfólio | topo do dashboard | Diz que os dados são fictícios ou de demonstração |
 | Aviso de qualidade | topo do dashboard | Diz que a nota depende da qualidade das evidências |
 | Aviso de verificação | rodapé do relatório | Diz que não há verificação de fonte automática |
-| Expiração de link | `GET /relatorio/:id` | Link para de funcionar em 30 dias |
+| Expiração de link | as 3 rotas que aceitam `id` | Relatório, nota e evidências param em 30 dias |
 | `id` como UUID v4 | URL do relatório | Torna a enumeração de relatórios inviável |
 
 O que **não** está implementado, e é preciso dizer com todas as letras:
@@ -134,8 +143,8 @@ O que **não** está implementado, e é preciso dizer com todas as letras:
 - **Não há limite de requisições.** Um laço de `POST` enche o disco, e o I/O é síncrono.
 - **Um link vazado vale até expirar.** Não há revogação, e o prazo de 30 dias é o único
   limite.
-- **A expiração vale para o relatório, não para o dado.** Quem souber o `id` continua
-  lendo `GET /nota` depois do prazo.
+- **A expiração vale para a leitura, mas `POST /evidencias` segue aberto.** Quem souber o
+  `id` de uma validação expirada ainda consegue registrar evidência contra ela.
 
 O relatório de cada tarefa tem uma auditoria Red Team que registra isso com o estado real
 do projeto, inclusive o que continua aberto.
@@ -166,7 +175,7 @@ Para rodar os testes:
 npm test
 ```
 
-São 98 testes automatizados, todos passando.
+São 105 testes automatizados, todos passando.
 
 Dois exemplos de chamada:
 
@@ -245,7 +254,10 @@ curl http://localhost:3000/nota
 | POST   | `/saude`           | `405` com o cabeçalho `Allow: GET`                                                                    |
 | POST   | `/evidencias`      | `201` com a evidência gravada, já com `id` e `timestamp` gerados pelo servidor. Aceita `id_validacao` opcional, que vincula a evidência a uma ideia |
 | POST   | `/evidencias`      | `400` com `{"error": "..."}` quando falta um campo obrigatório, ou o `tipo` ou a `relevancia` não valem   |
-| GET    | `/evidencias`      | `200` com `{"total": N, "evidencias": [...]}`. Com `?id=<id de validação>`, devolve só as evidências vinculadas a ela |
+| GET    | `/evidencias`      | `200` com `{"total": N, "evidencias": [...]}`. Sem filtro, devolve todas as evidências                  |
+| GET    | `/evidencias`      | `200` com só as evidências vinculadas, quando `?id=<id de validação>` existe e não está expirado          |
+| GET    | `/evidencias`      | `410` com `{"error": "Este link expirou"}` quando `?id=` aponta para uma validação com o prazo vencido    |
+| GET    | `/evidencias`      | `404` com `{"error": "Validacao nao encontrada"}` quando `?id=` não corresponde a nenhuma validação      |
 | outro  | `/evidencias`      | `405` com o cabeçalho `Allow: GET, POST` — a rota não aceita esse método                                  |
 | GET    | `/nota`            | `200` com `{"criterios", "total", "maximo_possivel", "veredito"}`. Com `?id=<id>`, a nota é só da ideia; sem ele, é a nota geral |
 | outro  | `/nota`            | `405` com o cabeçalho `Allow: GET` — a rota não aceita esse método                                     |
@@ -315,7 +327,7 @@ decisão, e é descrito na seção seguinte.
 | Arquivo                             | Função                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `server.js`                         | O serviço. Recebe requisições, valida, classifica, grava e devolve as respostas.                         |
-| `server.test.js`                    | 56 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
+| `server.test.js`                    | 63 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
 | `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações, dados de mercado, monetização e alcance. |
 | `evidencias.test.js`                | 19 testes do módulo de evidências, também com arquivos temporários.                                      |
 | `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua e deriva o veredito.                           |
@@ -342,7 +354,7 @@ Fase avançada: o serviço de validação e classificação está funcionando, a
 completa com os cinco critérios, cada nota vem com um veredito, e a nota é **por ideia**:
 as evidências se vinculam ao identificador da validação, e o relatório mostra a nota
 correta daquela ideia. Há um dashboard em HTML que gera um relatório A4 com link para
-compartilhar. São 98 testes automatizados, todos passando.
+compartilhar. São 105 testes automatizados, todos passando.
 
 O serviço é **público e de portfólio**, com isso avisado na própria interface: banner no
 dashboard, aviso de que os dados são de demonstração, aviso de que a qualidade da nota
