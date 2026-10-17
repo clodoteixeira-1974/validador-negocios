@@ -10,6 +10,8 @@ const {
 
 const { calcularNota } = require('./nota');
 
+const { criarLimitador } = require('./rate-limit');
+
 const { gerarHtmlRelatorio, gerarHtmlDashboard, escapar, formatarData } = require('./relatorio');
 
 const { lerJsonl, escreverJsonl, avisarLinhasIgnoradas } = require('./jsonl');
@@ -37,6 +39,10 @@ const CAMPOS_EVIDENCIA = ['tipo', 'fonte', 'url', 'trecho_bruto', 'ideia_relacio
 function classificarTipo(ideia) {
   return PADRAO_MOBILE.test(String(ideia)) ? 'mobile' : 'outro';
 }
+
+// Días que um link de relatório permanece válido. Decisão do PO: 30 dias.
+const DIAS_EXPIRACAO = 30;
+const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
 // Valida o corpo da requisição. Devolve { ok, status, erro } ou { ok, ideia }.
 function validarIdeia(corpo) {
@@ -143,6 +149,15 @@ function createApp(opcoes = {}) {
 
   const app = express();
 
+  // Limites de taxa. Cada um nasce aqui, dentro de createApp, e por isso cada
+  // instância de teste começa com o balde vazio. Ver rate-limit.js.
+  const limiteValidarIdeia = criarLimitador({ maximo: 10 });
+  const limiteEscreverEvidencia = criarLimitador({ maximo: 30 });
+  const limiteListarEvidencias = criarLimitador({ maximo: 30 });
+  const limiteRelatorio = criarLimitador({ maximo: 60 });
+  const limiteNota = criarLimitador({ maximo: 60 });
+  const limiteDashboard = criarLimitador({ maximo: 60 });
+
   // Middleware para parsear JSON, com limite de tamanho de corpo
   app.use(express.json({ limit: LIMITE_CORPO }));
 
@@ -157,13 +172,9 @@ function createApp(opcoes = {}) {
     return res.status(405).json({ error: 'Metodo nao permitido', permitido: 'GET' });
   });
 
-  // Días que um link de relatório permanece válido. Decisão do PO: 30 dias.
-const DIAS_EXPIRACAO = 30;
-const MS_POR_DIA = 24 * 60 * 60 * 1000;
-
-// Data de expiração do link de relatório: 30 dias a partir de agora, em ISO.
-// Validação antiga, sem expires_at, é tratada como não expirada — ver CONTRATO.md.
-function gerarExpiracao(agora = Date.now()) {
+  // Data de expiração do link de relatório: 30 dias a partir de agora, em ISO.
+  // Validação antiga, sem expires_at, é tratada como não expirada — ver CONTRATO.md.
+  function gerarExpiracao(agora = Date.now()) {
   return new Date(agora + DIAS_EXPIRACAO * MS_POR_DIA).toISOString();
 }
 
@@ -183,7 +194,7 @@ function linkExpirado(validacao, agora = Date.now()) {
 }
 
 // Endpoint POST /validar-ideia
-  app.post('/validar-ideia', (req, res) => {
+  app.post('/validar-ideia', limiteValidarIdeia, (req, res) => {
     const resultado = validarIdeia(req.body);
 
     if (!resultado.ok) {
@@ -219,9 +230,19 @@ function linkExpirado(validacao, agora = Date.now()) {
   // Lista as evidencias gravadas. Com ?id=<id de validacao>, devolve so as
 // evidencias vinculadas a ele e a nota passa a ser por ideia; sem o parametro,
 // devolve todas e a nota e a geral.
+  // A listagem global devolve o arquivo inteiro de uma vez, e a rota mais cara
+  // de ler. Leva limite proprio; o filtro por ?id= nao passa por aqui.
   app.get('/evidencias', (req, res) => {
-    const filtro = typeof req.query.id === 'string' ? req.query.id : undefined;
+    if (typeof req.query.id !== 'string') {
+      return limiteListarEvidencias(req, res, () => responderEvidencias(req, res, undefined));
+    }
 
+    return responderEvidencias(req, res, req.query.id);
+  });
+
+  // Filtra por id e devolve o envelope { total, evidencias }. A checagem de
+  // expiracao fica na rota, antes de chegar aqui.
+  function responderEvidencias(req, res, filtro) {
     // Com ?id=, o filtro so funciona para uma validacao que existe e nao expirou.
     // Sem essa checagem, este era o ultimo caminho de leitura que aceitava um id de
     // validacao depois do prazo: o relatorio e a nota fechavam, e as evidencias cruas
@@ -230,7 +251,7 @@ function linkExpirado(validacao, agora = Date.now()) {
       const validacao = buscarValidacao(filtro, arquivoValidacoes);
 
       // 404 e nao lista vazia: antes, um id inexistente devolvia 200 com zero
-      // evidencias, e isso indistinguia "nao ha evidencia" de "esse id nao existe".
+      // evidencias, e isso indistinguia "nao ha evidencia para este id" de "este id nao existe".
       if (!validacao) {
         return res.status(404).json({ error: 'Validacao nao encontrada' });
       }
@@ -242,11 +263,11 @@ function linkExpirado(validacao, agora = Date.now()) {
 
     const evidencias = listarEvidencias(arquivoEvidencias, filtro);
     return res.json({ total: evidencias.length, evidencias });
-  });
+  }
 
   // Registra uma evidencia. id e timestamp sao gerados pelo modulo, nunca
   // aceitos do cliente. O modulo lanca Error com .erros quando a evidencia e invalida.
-  app.post('/evidencias', (req, res) => {
+  app.post('/evidencias', limiteEscreverEvidencia, (req, res) => {
     const corpo = req.body;
     const dados = {};
 
@@ -270,7 +291,7 @@ function linkExpirado(validacao, agora = Date.now()) {
   // continuaria lendo a nota depois do prazo, que e o mesmo vazamento por outro
   // caminho. A nota geral, sem ?id=, nao tem prazo: ela nao pertence a uma
   // validacao, e nao ha expires_at de onde tirar um.
-  app.get('/nota', (req, res) => {
+  app.get('/nota', limiteNota, (req, res) => {
     const filtro = typeof req.query.id === 'string' ? req.query.id : undefined;
 
     if (filtro !== undefined) {
@@ -287,12 +308,12 @@ function linkExpirado(validacao, agora = Date.now()) {
   });
 
   // Dashboard: formulário de ideia e resultado, com link de compartilhamento.
-  app.get('/dashboard', (req, res) => {
+  app.get('/dashboard', limiteDashboard, (req, res) => {
     res.type('html').send(gerarHtmlDashboard());
   });
 
   // Relatório de uma validação, em HTML meant para impressão em A4.
-  app.get('/relatorio/:id', (req, res) => {
+  app.get('/relatorio/:id', limiteRelatorio, (req, res) => {
     const validacao = buscarValidacao(req.params.id, arquivoValidacoes);
 
     if (!validacao) {

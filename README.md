@@ -133,19 +133,53 @@ O serviço é público, de portfólio, e é honesto sobre isso. O que está impl
 | Aviso de verificação | rodapé do relatório | Diz que não há verificação de fonte automática |
 | Expiração de link | as 3 rotas que aceitam `id` | Relatório, nota e evidências param em 30 dias |
 | `id` como UUID v4 | URL do relatório | Torna a enumeração de relatórios inviável |
+| Limite de taxa | 6 rotas | De 10 a 60 requisições por IP, por minuto |
+
+### Limite de taxa
+
+O serviço é público, então cada rota tem um teto por IP, na janela de 1 minuto. A requisição
+barrada **nunca chega ao handler**: ela não grava arquivo e não calcula nota.
+
+| Rota | Limite por IP |
+| --- | --- |
+| `POST /validar-ideia` | 10 |
+| `POST /evidencias` | 30 |
+| `GET /evidencias` sem filtro | 30 |
+| `GET /relatorio/:id` | 60 |
+| `GET /nota` | 60 |
+| `GET /dashboard` | 60 |
+
+`GET /saude` não tem limite, de propósito: é o que o balanceador consulta para saber se a
+instância está viva. `GET /evidencias?id=` e `GET /nota?id=` também não têm, porque exigem um
+`id` em UUID v4, que é caro de adivinhar.
+
+Quando o limite estoura, a resposta é `429` com
+`{"error": "Muitas requisicoes. Tente novamente em 1 minuto."}`, o header `Retry-After` em
+segundos, e os headers `X-RateLimit-Limit` e `X-RateLimit-Remaining` em toda resposta.
+
+**Três coisas que o limite não é**, e que valem mais que a lista acima:
+
+- **é em memória e por processo.** Reiniciar zera os contadores, e com duas instâncias
+  atrás de balanceador cada uma tem o seu balde, então o limite efetivo dobra;
+- **atrás de proxy, `req.ip` é o IP do proxy**, e todo mundo cai no mesmo balde. Para a VPS é
+  preciso ligar `app.set('trust proxy', ...)`;
+- **não é autenticação nem defesa contra abuso distribuído.** Quem tem muitos IPs passa, e
+  quem está atrás de NAT divide o limite com o resto da rede.
+
+`X-Forwarded-For` é ignorado de propósito: sem `trust proxy`, qualquer cliente burlaria o
+limite só enviando o header.
 
 O que **não** está implementado, e é preciso dizer com todas as letras:
 
 - **Não há autenticação.** Qualquer pessoa que chegue ao serviço valida uma ideia.
-- **`POST /evidencias` é aberto e sem limite de taxa.** Qualquer pessoa pode registrar
-  evidência para qualquer `id_validacao`, inclusive evidência de concorrente, que faz a nota
-  subir. O aviso de qualidade existe, mas **aviso não é controle**.
-- **Não há limite de requisições.** Um laço de `POST` enche o disco, e o I/O é síncrono.
+- **`POST /evidencias` é aberto.** Qualquer pessoa pode registrar evidência para qualquer
+  `id_validacao`, inclusive evidência de concorrente, que faz a nota subir. O limite de taxa
+  limita **quanto**, não **quem**: 30 por minuto ainda é 30 por minuto de envenenamento. O
+  aviso de qualidade existe, mas **aviso não é controle**.
 - **Um link vazado vale até expirar.** Não há revogação, e o prazo de 30 dias é o único
   limite.
 - **A expiração vale para a leitura, mas `POST /evidencias` segue aberto.** Quem souber o
   `id` de uma validação expirada ainda consegue registrar evidência contra ela.
-
 O relatório de cada tarefa tem uma auditoria Red Team que registra isso com o estado real
 do projeto, inclusive o que continua aberto.
 

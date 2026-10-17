@@ -236,6 +236,79 @@ afirmação que ele faz é sobre como a nota é construída, e não sobre o que 
 Todo dado vindo da Validação, da Evidência ou da Nota passa por `escapar()` antes de entrar
 no HTML.
 
+## Limite de taxa
+
+O serviço é público, e sem limite um laço de escrita enche o disco e um laço de
+`GET /evidencias` sem filtro segura o event loop, porque o I/O do projeto é síncrono. Cada
+rota tem um limite por IP, em janela de 1 minuto.
+
+| Rota | Limite por IP | Por que |
+| --- | --- | --- |
+| `POST /validar-ideia` | 10 | escreve em `validacoes.jsonl`, e a mais cara de abusive |
+| `POST /evidencias` | 30 | escreve em `evidencias.jsonl`, e uma evidência move nota alheia |
+| `GET /evidencias` sem filtro | 30 | devolve o arquivo inteiro de uma vez |
+| `GET /relatorio/:id` | 60 | renderiza HTML e calcula nota |
+| `GET /nota` | 60 | recalcula a nota a cada chamada |
+| `GET /dashboard` | 60 | entrega a página inteira |
+
+Sem limite, de propósito:
+
+| Rota | Por que |
+| --- | --- |
+| `GET /saude` | é o que o balanceador consulta para saber se a instância está viva |
+| `GET /evidencias?id=` | filtra por `id_validacao`, que já é um UUID v4 caro de adivinhar |
+| `GET /nota?id=` | idem, e a resposta é pequena |
+| `404` e `405` | são cheap e devem continuar cheap para o cliente se orientar |
+
+**`GET /evidencias` tem dois limites, e isso não é descuido.** A rota se divide antes do
+limitador: sem `?id=` ela passa pelo limite de 30, e com `?id=` não passa por nenhum. O filtro
+por `id` exige um UUID v4, que é caro de adivinhar, e a resposta é pequena; a listagem global
+lê o arquivo inteiro e é a rota mais cara de servir.
+
+### Resposta 429
+
+```json
+{ "error": "Muitas requisicoes. Tente novamente em 1 minuto." }
+```
+
+A requisição **nunca chega ao handler**: o limitador é middleware e responde antes de ler o
+corpo, gravar arquivo ou calcular nota. Um `POST` barrado não cria registro.
+
+Toda resposta, bem-sucedida ou barrada, traz:
+
+| Header | Conteúdo |
+| --- | --- |
+| `X-RateLimit-Limit` | o limite da rota, como string |
+| `X-RateLimit-Remaining` | quantas ainda restam, `0` quando acabou |
+| `Retry-After` | só no `429`: segundos até a janela abrir |
+
+O `Retry-After` é calculado de verdade, com o fim da janela do IP. **O texto da mensagem diz
+"em 1 minuto" e está amarrado à janela padrão de 60 s**: mudar a janela sem mudar o texto
+faria a resposta mentir. Quem integra deve usar o `Retry-After`, que não mente.
+
+O `429` não devolve `Allow`, porque não é problema de método, e sim de volume.
+
+### O limite é em memória, por IP, e por instância
+
+Isto é o que o mecanismo **não** é, e precisa estar escrito:
+
+- **Em memória, num `Map` por processo.** Reiniciar o serviço zera todos os contadores.
+  Não há persistência de contagem.
+- **Por processo.** Com duas instâncias atrás de balanceador, cada uma tem seu balde. O
+  limite efetivo dobra, e ninguém está contando isso.
+- **Por IP, usando `req.ip`.** Atrás de proxy ou balanceador, `req.ip` é o endereço do
+  proxy: **todo mundo compartilha um único balde**, e o limite passa a valer para o serviço
+  inteiro em vez de para a pessoa. Para a VPS, é preciso ligar `app.set('trust proxy', ...)`,
+  e aí o `X-Forwarded-For` passa a valer.
+- **`X-Forwarded-For` é ignorado de propósito.** Ler o header sem `trust proxy` deixaria
+  qualquer cliente burlar o limite num serviço sem proxy nenhum, só enviando o header.
+  Preferi o limite conservador, que é o de errar por excesso de restrição.
+- **Não é autenticação e não é defesa contra abuso distribuído.** Um atacante com muitos
+  IPs continua passando, e um atrás de NAT compartilha o limite com o resto do prédio.
+
+A limpeza das entradas vencidas é preguiçosa e acontece **só quando alguém é barrado**,
+nesse momento. Sem isso o `Map` só cresceria. O efeito é que, em serviço silencioso, o `Map`
+guarda o que acumulou até o primeiro `429`.
 ## Comportamento de leitura de `.jsonl`
 
 Os dois arquivos, `validacoes.jsonl` e `evidencias.jsonl`, são lidos pela **mesma função**,

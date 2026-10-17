@@ -51,6 +51,8 @@ real, e falta proteger as rotas de escrita.
 - fix-06: classificação com limite de palavra
 - fix-07: UUID v4 no ID da validação
 - fix-08: disclaimers, expiração de links e vitrine de portfólio
+- fix-09: expiracao em `GET /evidencias?id=`
+- Tarefa 26: limite de taxa por IP nas rotas caras, em `rate-limit.js`
 
 ### Decisões do PO sobre acesso e apresentação
 
@@ -67,8 +69,9 @@ só, e nenhum placeholder chegou ao HTML.
 
 ### O que falta
 
-- [Alta] Limite de taxa em `POST /validar-ideia` e `POST /evidencias`. Com o serviço
-  público e sem limite, um laço de escrita enche o disco, e o I/O é síncrono
+- [Média] Limite de taxa **compartilhado entre instâncias**. O limite existe por
+  processo, em memória, então com duas instâncias atrás de balanceador o teto efetivo
+  dobra. E atrás de proxy, sem `trust proxy`, todo mundo cai no mesmo balde do proxy
 - [Alta] Coleta real de concorrentes e reclamações
 - [Alta] Vínculo automático entre ideia e evidência na hora de coletar
 - [Média] Autenticação ou revogação de link. A expiração de 30 dias fecha o relatório, a nota por
@@ -113,7 +116,11 @@ O motivo de cada decisão está na seção "Decisões tomadas e por quê".
 - **Comando `memory` inexistente**, pedido pelo `AGENTS.md`. Alternativa: ler este arquivo
 - **Sem backup dos `.jsonl`**, que são ignorados pelo Git e vivem só na máquina local
 - **Sem `.env`**, que vai ser necessário quando houver LLM
-- **Link de compartilhamento sem controle de acesso**, agora com expiração de 30 dias
+- **Limite de taxa é por processo e em memória**: com duas instâncias atrás de balanceador, o
+  teto efetivo dobra. Atrás de proxy sem `trust proxy`, todo mundo divide o balde do proxy.
+  `GET /saude` precisa ficar ilimitada para o balanceador continuar funcionando
+- **`X-Forwarded-For` é ignorado de propósito**: ler o header sem `trust proxy` deixaria
+  qualquer cliente burlar o limite só enviando o header- **Link de compartilhamento sem controle de acesso**, agora com expiração de 30 dias
 - **`navigator.clipboard` exige contexto seguro**: por HTTP fora de `localhost` a cópia
   falha
 
@@ -222,7 +229,7 @@ dados de verdade e o relatório final ainda não existem.
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 105 testes automatizados (63 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
+- 113 testes automatizados (71 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
   `nota.test.js`)
 - **Leitura de `.jsonl` resiliente e unificada**: `validacoes.jsonl` e `evidencias.jsonl` são
   lidos pela mesma função, em `jsonl.js`. Linha corrompida é ignorada com aviso em
@@ -244,7 +251,14 @@ dados de verdade e o relatório final ainda não existem.
 - **Avisos de portfólio na interface**: banner no topo do dashboard dizendo que os dados são
   fictícios ou de demonstração, aviso de que a nota depende da qualidade das evidências, e
   rodapé com o perfil do autor e botão "Ver código-fonte" para o repositório
-- **Aviso no relatório** de que as evidências vêm de usuários e não há verificação de fonte
+- **Limite de taxa por IP nas rotas caras**, em `rate-limit.js`, sem dependência externa.
+  `POST /validar-ideia` 10 por minuto, `POST /evidencias` 30, `GET /evidencias` sem filtro
+  30, e 60 para relatório, nota e dashboard. A requisição barrada recebe `429` com
+  `Retry-After` e **nunca chega ao handler**, então não grava arquivo nem calcula nota.
+  `GET /saude` ficou sem limite de propósito, porque é o que o balanceador consulta
+- **Limite em memória e por processo**, e as consequências estão anotadas: reiniciar zera,
+  duas instâncias dobram o teto efetivo, e atrás de proxy sem `trust proxy` todo mundo cai
+  no mesmo balde. `X-Forwarded-For` é ignorado de propósito, para não ser burlado- **Aviso no relatório** de que as evidências vêm de usuários e não há verificação de fonte
   automática, seguido da data de expiração do link
 - **Página de link expirado** em HTML simples, sem o CSS pesado do relatório
 
@@ -314,7 +328,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 105 testes automatizados
+npm test        # roda os 113 testes automatizados
 ```
 
 Exemplos de chamada:

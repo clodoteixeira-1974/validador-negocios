@@ -1436,3 +1436,160 @@ test('GET /evidencias sem ?id= continua listando todas, mesmo com validacoes exp
     assert.equal(corpo.total, 2, 'a listagem global nao tem prazo');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Limite de taxa (Tarefa 26)
+//
+// Cada teste abaixo cria o servidor por comServidor, e cada createApp cria os
+// limitadores novos. O balde de cada IP comeca vazio a cada teste, entao nao ha
+// necessidade de IP falso por header nem de funcao de reset: o isolamento vem de
+// criar a instancia, nao de contornar o limite.
+// ---------------------------------------------------------------------------
+
+async function repetir(requisicao, vezes) {
+  const respostas = [];
+
+  for (let i = 0; i < vezes; i += 1) {
+    respostas.push(await requisicao());
+  }
+
+  return respostas;
+}
+
+test('POST /validar-ideia barra a 11a requisicao do mesmo IP', async () => {
+  await comServidor(async ({ base }) => {
+    const respostas = await repetir(
+      () => post(base, { ideia: 'App para controlar gastos' }),
+      11
+    );
+
+    // Dez passam, a decima primeira e barrada.
+    for (const resposta of respostas.slice(0, 10)) {
+      assert.equal(resposta.status, 200);
+    }
+
+    assert.equal(respostas[10].status, 429);
+    assert.deepEqual(respostas[10].corpo, {
+      error: 'Muitas requisicoes. Tente novamente em 1 minuto.'
+    });
+  });
+});
+
+test('POST /evidencias barra a 31a requisicao do mesmo IP', async () => {
+  await comServidor(async ({ base }) => {
+    const respostas = await repetir(
+      () => postEvidencia(base, evidenciaValida({ fonte: 'Concorrente' })),
+      31
+    );
+
+    for (const resposta of respostas.slice(0, 30)) {
+      assert.equal(resposta.status, 201);
+    }
+
+    assert.equal(respostas[30].status, 429);
+    assert.match(respostas[30].corpo.error, /Muitas requisicoes/);
+  });
+});
+
+test('GET /evidencias sem filtro barra a 31a requisicao, mas o filtro por id nao conta', async () => {
+  await comServidor(async ({ base }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+
+    const respostas = await repetir(() => getEvidencias(base), 31);
+
+    for (const resposta of respostas.slice(0, 30)) {
+      assert.equal(resposta.status, 200);
+    }
+
+    assert.equal(respostas[30].status, 429);
+
+    // O limite e so da listagem global. Filtrar por id nao passa pelo limitador,
+    // e continua respondendo depois de a listagem ter sido barrada.
+    const filtrada = await fetch(`${base}/evidencias?id=${encodeURIComponent(validacao.corpo.id)}`);
+    assert.equal(filtrada.status, 200);
+  });
+});
+
+test('GET /relatorio/:id barra a 61a requisicao do mesmo IP', async () => {
+  await comServidor(async ({ base }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+    const url = `${base}/relatorio/${validacao.corpo.id}`;
+
+    const respostas = await repetir(() => fetch(url), 61);
+
+    for (const resposta of respostas.slice(0, 60)) {
+      assert.equal(resposta.status, 200);
+    }
+
+    assert.equal(respostas[60].status, 429);
+  });
+});
+
+test('GET /nota barra a 61a requisicao do mesmo IP', async () => {
+  await comServidor(async ({ base }) => {
+    const respostas = await repetir(() => getNota(base), 61);
+
+    for (const resposta of respostas.slice(0, 60)) {
+      assert.equal(resposta.status, 200);
+    }
+
+    assert.equal(respostas[60].status, 429);
+  });
+});
+
+test('GET /dashboard barra a 61a requisicao do mesmo IP', async () => {
+  await comServidor(async ({ base }) => {
+    const respostas = await repetir(() => fetch(`${base}/dashboard`), 61);
+
+    for (const resposta of respostas.slice(0, 60)) {
+      assert.equal(resposta.status, 200);
+    }
+
+    assert.equal(respostas[60].status, 429);
+  });
+});
+
+test('GET /saude nao tem limite: 100 requisicoes seguidas respondem 200', async () => {
+  await comServidor(async ({ base }) => {
+    // Healthcheck sem limite é deliberado: é o que o balanceador consulta para
+    // saber se a instância está viva, e um healthcheck barrado derruba a instância.
+    const respostas = await repetir(() => fetch(`${base}/saude`), 100);
+
+    for (const resposta of respostas) {
+      assert.equal(resposta.status, 200);
+    }
+  });
+});
+
+test('a resposta 429 traz Retry-After em segundos e os headers de contagem', async () => {
+  await comServidor(async ({ base }) => {
+    const pedir = () => fetch(`${base}/validar-ideia`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ideia: 'App para controlar gastos' })
+    });
+
+    await repetir(pedir, 10);
+
+    // fetch cru, e nao o helper post(), porque este teste precisa dos headers:
+    // o helper devolve so o corpo.
+    const resposta = await pedir();
+    assert.equal(resposta.status, 429);
+    assert.match(resposta.headers.get('content-type') || '', /json/);
+
+    const corpo = await resposta.json();
+    assert.deepEqual(corpo, {
+      error: 'Muitas requisicoes. Tente novamente em 1 minuto.'
+    });
+
+    const segundos = Number(resposta.headers.get('retry-after'));
+    assert.ok(Number.isInteger(segundos), 'Retry-After precisa ser um inteiro');
+    assert.ok(segundos > 0 && segundos <= 60,
+      `Retry-After deveria estar entre 1 e 60, veio ${segundos}`);
+
+    // Os headers de contagem ajudam o cliente a se regular sem gastar uma
+    // requisicao para descobrir que está no fim.
+    assert.equal(resposta.headers.get('x-ratelimit-limit'), '10');
+    assert.equal(resposta.headers.get('x-ratelimit-remaining'), '0');
+  });
+});
