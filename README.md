@@ -28,7 +28,7 @@ As evidências são identificadas e datadas pelo próprio servidor: o cliente n�
 identificador nem a data, apenas o conteúdo da evidência. Um registro sem os campos
 obrigatórios é recusado com erro, e nada é gravado.
 
-A nota é um número de 0 a 5 pontos, dividido em cinco critérios. **Quatro deles já estão
+A nota é um número de 0 a 5 pontos, dividido em cinco critérios. **Todos os cinco já estão
 implementados**:
 
 - **"Tem gente?"** — concede 1 ponto quando há 2 ou mais concorrentes registrados.
@@ -39,9 +39,11 @@ implementados**:
   saturado.
 - **"Alguém paga?"** — concede 1 ponto quando há pelo menos uma evidência de monetização, ou
   seja, alguém já pagando por um serviço parecido.
+- **"Você alcança essas pessoas?"** — concede 1 ponto quando há pelo menos uma evidência de
+  alcance, ou seja, um caminho conhecido para chegar ao público-alvo.
 
-O quinto critério ainda não existe. Por enquanto a nota é geral, ou seja, considera todas as
-evidências guardadas, sem distinguir uma ideia da outra.
+A régua está completa. Por enquanto a nota é geral, ou seja, considera todas as evidências
+guardadas, sem distinguir uma ideia da outra.
 
 O projeto foi construído em etapas pequenas, cada uma com testes automatizados e um
 relatório em `relatorios/` explicando o que foi feito e por quê.
@@ -68,7 +70,7 @@ Para rodar os testes:
 npm test
 ```
 
-São 54 testes automatizados, todos passando.
+São 62 testes automatizados, todos passando.
 
 Dois exemplos de chamada:
 
@@ -100,6 +102,15 @@ Um exemplo de evidência de monetização, o tipo que alimenta o critério "algu
 curl -X POST http://localhost:3000/evidencias \
   -H "Content-Type: application/json" \
   -d "{\"tipo\":\"monetizacao\",\"fonte\":\"Página de preços de concorrente\",\"url\":\"https://exemplo.com/precos\",\"trecho_bruto\":\"Planos a partir de R$ 19,90 por mês.\",\"ideia_relacionada\":\"App para controlar gastos\",\"relevancia\":\"alta\"}"
+```
+
+Um exemplo de evidência de alcance, o tipo que alimenta o critério "você alcança essas
+pessoas?":
+
+```bash
+curl -X POST http://localhost:3000/evidencias \
+  -H "Content-Type: application/json" \
+  -d "{\"tipo\":\"alcance\",\"fonte\":\"Relatório de audiência de um canal\",\"url\":\"https://exemplo.com/audiencia\",\"trecho_bruto\":\"O público-alvo está concentrado em um grupo específico, com canal de acesso conhecido.\",\"ideia_relacionada\":\"App para controlar gastos\",\"relevancia\":\"alta\"}"
 ```
 
 E um exemplo de nota:
@@ -153,28 +164,33 @@ Um exemplo de resposta de `/nota`, com três concorrentes e duas reclamações r
       "pontos": 1,
       "maximo": 1,
       "detalhe": "1 evidencia de monetizacao registrada."
+    },
+    "alcance": {
+      "pontos": 1,
+      "maximo": 1,
+      "detalhe": "1 evidencia de alcance registrada."
     }
   },
-  "total": 4,
-  "maximo_possivel": 4
+  "total": 5,
+  "maximo_possivel": 5
 }
 ```
 
 Cada critério traz três coisas: os pontos que concedeu, o máximo que poderia conceder e um
 texto explicando como chegou ao resultado. O `total` é a soma dos pontos e o
-`maximo_possivel` é a soma dos máximos, então os dois crescem sozinhos a cada critério que
-entra. Hoje valem 4 e 4, porque existem quatro critérios.
+`maximo_possivel` é a soma dos máximos. Com os cinco critérios implementados, a escala vai de
+0 a 5 e está fechada: `maximo_possivel` não muda mais.
 
 ## Estrutura do projeto
 
 | Arquivo                             | Função                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `server.js`                         | O serviço. Recebe requisições, valida, classifica, grava e devolve as respostas.                         |
-| `server.test.js`                    | 28 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
-| `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações, dados de mercado e monetização. |
-| `evidencias.test.js`                | 9 testes do módulo de evidências, também com arquivos temporários.                                       |
+| `server.test.js`                    | 30 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
+| `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações, dados de mercado, monetização e alcance. |
+| `evidencias.test.js`                | 11 testes do módulo de evidências, também com arquivos temporários.                                      |
 | `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua às evidências registradas.                    |
-| `nota.test.js`                      | 17 testes do cálculo da nota, sem HTTP e sem disco.                                                       |
+| `nota.test.js`                      | 21 testes do cálculo da nota, sem HTTP e sem disco.                                                       |
 | `testar-evidencias.js`              | Script de verificação manual do módulo de evidências.                                                     |
 | `package.json`                      | Nome do projeto e os comandos `start` e `test`.                                                          |
 | `validacoes.jsonl`                  | Registro das validações recebidas (gerado em execução, não versionado).                                  |
@@ -191,18 +207,20 @@ nativo do Node.js.
 
 ## Estado do projeto
 
-Fase intermediária: o serviço de validação e classificação está funcionando, as rotas de
-evidências estão integradas ao servidor, e quatro dos cinco critérios da régua de
-viabilidade já calculam a nota a partir das evidências registradas. São 54 testes
-automatizados, todos passando.
+Fase avançada: o serviço de validação e classificação está funcionando, as rotas de
+evidências estão integradas ao servidor, e **a régua está completa**: os cinco critérios
+calculam a nota a partir das evidências registradas. São 62 testes automatizados, todos
+passando.
 
-O que ainda falta: implementar o último critério, coletar concorrentes e reclamações de
+O que ainda falta: derivar o veredito a partir da nota, coletar concorrentes e reclamações de
 verdade, e só então gerar o relatório final.
 
 ## Próximos passos
 
-- Implementar o quinto e último critério da régua ("você alcança essas pessoas?")
+- Derivar o veredito a partir da nota (parar, mudar o recorte ou seguir)
 - Coletar concorrentes reais e extrair reclamações de usuários
+- Gerar relatório final em PDF
+- Interface web e publicação do serviço
 - Coletar concorrentes reais e extrair reclamações de usuários
 - Integrar um modelo de linguagem e busca semântica (RAG)
 - Gerar relatório final em PDF

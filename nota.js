@@ -35,6 +35,12 @@ const PONTOS_CABE_MAIS_UM = 1;
 const MINIMO_MONETIZACOES = 1;
 const PONTOS_ALGUEM_PAGA = 1;
 
+// Critério 5 da régua: "você alcança essas pessoas?".
+// Conta as evidências do tipo "alcance", que mostram um caminho para chegar ao
+// público-alvo. Basta uma para o ponto ser atribuído.
+const MINIMO_ALCANCE = 1;
+const PONTOS_ALCANCE = 1;
+
 // Monta o texto do campo "detalhe" do critério "tem_gente".
 function detalharTemGente(total) {
   if (total === 0) {
@@ -89,6 +95,19 @@ function detalharAlguemPaga(total) {
   }
 
   return `${total} evidencias de monetizacao registradas.`;
+}
+
+// Monta o texto do campo "detalhe" do critério "alcance".
+function detalharAlcance(total) {
+  if (total === 0) {
+    return 'Nenhuma evidencia de alcance registrada.';
+  }
+
+  if (total === 1) {
+    return '1 evidencia de alcance registrada.';
+  }
+
+  return `${total} evidencias de alcance registradas.`;
 }
 
 // Conta as evidências de um tipo, ignorando entradas nulas ou sem tipo.
@@ -159,13 +178,26 @@ function avaliarAlguemPaga(evidencias) {
   );
 }
 
+// Avalia o critério "você alcança essas pessoas?".
+// Cabe em avaliarContagem: é uma contagem com mínimo, sem máximo.
+function avaliarAlcance(evidencias) {
+  return avaliarContagem(
+    evidencias,
+    'alcance',
+    MINIMO_ALCANCE,
+    PONTOS_ALCANCE,
+    detalharAlcance
+  );
+}
+
 // Lista os critérios implementados, na ordem da régua. Para acrescentar um
 // critério novo, basta declarar a função avaliadora e incluí-la aqui.
 const CRITERIOS = [
   { nome: 'tem_gente', avaliar: avaliarTemGente },
   { nome: 'tem_gente_insatisfeita', avaliar: avaliarTemGenteInsatisfeita },
   { nome: 'cabe_mais_um', avaliar: avaliarCabeMaisUm },
-  { nome: 'alguem_paga', avaliar: avaliarAlguemPaga }
+  { nome: 'alguem_paga', avaliar: avaliarAlguemPaga },
+  { nome: 'alcance', avaliar: avaliarAlcance }
 ];
 
 // Calcula a nota completa.
@@ -201,5 +233,7 @@ module.exports = {
   MAXIMO_CONCORRENTES_CABE_MAIS_UM,
   PONTOS_CABE_MAIS_UM,
   MINIMO_MONETIZACOES,
-  PONTOS_ALGUEM_PAGA
+  PONTOS_ALGUEM_PAGA,
+  MINIMO_ALCANCE,
+  PONTOS_ALCANCE
 };

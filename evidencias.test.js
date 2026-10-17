@@ -228,3 +228,58 @@ test('o tipo "monetizacao" convive com os outros tres na mesma gravacao', async 
     );
   });
 });
+
+test('tipo "alcance" é aceito, gravado e listado', async () => {
+  await comArquivo(async (arquivo) => {
+    // O novo tipo está na lista de tipos válidos.
+    assert.ok(TIPOS.includes('alcance'));
+
+    const gravada = registrarEvidencia(definicaoValida({
+      tipo: 'alcance',
+      fonte: 'Relatorio de audiencia de um canal',
+      url: 'https://exemplo.com/audiencia',
+      trecho_bruto: 'O publico-alvo esta concentrado em um grupo especifico, com canal de acesso conhecido.',
+      relevancia: 'alta'
+    }), arquivo);
+
+    assert.equal(gravada.tipo, 'alcance');
+    assert.equal(gravada.fonte, 'Relatorio de audiencia de um canal');
+
+    // Nada foi recusado: o registro está no arquivo e volta na listagem.
+    const linhas = lerLinhas(arquivo);
+    assert.equal(linhas.length, 1);
+
+    const listadas = listarEvidencias(arquivo);
+    assert.equal(listadas.length, 1);
+    assert.deepEqual(listadas[0], gravada);
+    assert.equal(listadas[0].tipo, 'alcance');
+
+    // E continua sendo uma evidência válida para o módulo.
+    assert.deepEqual(validarEvidencia(gravada), []);
+  });
+});
+
+test('os 5 tipos convivem na mesma gravacao, na ordem em que foram gravados', async () => {
+  await comArquivo(async (arquivo) => {
+    registrarEvidencia(definicaoValida({ tipo: 'concorrente' }), arquivo);
+    registrarEvidencia(definicaoValida({ tipo: 'reclamacao' }), arquivo);
+    registrarEvidencia(definicaoValida({ tipo: 'dado_mercado' }), arquivo);
+    registrarEvidencia(definicaoValida({ tipo: 'monetizacao' }), arquivo);
+    registrarEvidencia(definicaoValida({ tipo: 'alcance' }), arquivo);
+
+    const listadas = listarEvidencias(arquivo);
+
+    assert.equal(listadas.length, 5);
+    assert.deepEqual(
+      listadas.map((evidencia) => evidencia.tipo),
+      ['concorrente', 'reclamacao', 'dado_mercado', 'monetizacao', 'alcance']
+    );
+
+    // Todos os cinco tipos do módulo estão representados, e nenhum outro.
+    assert.equal(TIPOS.length, 5);
+    assert.deepEqual(
+      Array.from(new Set(listadas.map((evidencia) => evidencia.tipo))).sort(),
+      TIPOS.slice().sort()
+    );
+  });
+});
