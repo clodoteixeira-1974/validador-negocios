@@ -3,6 +3,87 @@
 Documento de memória de trabalho. Qualquer pessoa (ou IA) que abrir este repositório
 começa por aqui para saber onde o projeto está.
 
+## Pipeline de evolução
+
+Resumo do projeto para quem chega agora. O padrão desta seção está em
+`relatorios/TEMPLATE-PIPELINE.md`, e ela aparece também, ao final, em todo relatório novo.
+**Ela é atualizada a cada tarefa concluída.** A lista do que foi feito é cumulativa: item
+concluído sai da lista do que falta.
+
+### Onde estamos
+
+Fase em que a ideia vira um documento legível por outra pessoa: régua completa, veredito,
+nota por ideia e link de compartilhamento. Falta o dado real.
+
+### O que foi feito até aqui
+
+- Tarefa 01: inspeção do ambiente (relatório reconstruído na Tarefa 09)
+- Tarefa 02: endpoint `POST /validar-ideia`
+- Tarefa 03: classificação determinística mobile/outro
+- Tarefa 04: persistência em JSON Lines
+- Tarefa 05: módulo `evidencias.js`
+- Tarefa 06: unificação em uma única implementação
+- Tarefa 07: remoção da duplicata `app/`
+- Tarefa 08: organização para portfólio
+- Tarefa 09: limpeza estrutural, injeção de caminho e `.gitattributes`
+- Tarefa 10: atualização deste arquivo e migração para o GitHub
+- Tarefa 11: `POST /evidencias` e `GET /evidencias`
+- Tarefa 12: documentação das rotas de evidências
+- Tarefa 13: primeiro critério da régua ("tem gente?")
+- Tarefa 14: regras do projeto e convenção de nomes de relatório
+- Tarefa 15: segundo critério ("tem gente insatisfeita?") e soma dos pontos
+- fix-01: `405` em `/nota` e teste de `405` em `/evidencias`
+- Tarefa 16: terceiro critério ("cabe mais um?")
+- Tarefa 17: quarto critério ("alguém paga?") e tipo `monetizacao`
+- Tarefa 18: quinto critério ("você alcança essas pessoas?") e tipo `alcance`
+- Tarefa 19: veredito derivado da nota
+- Tarefa 20: dashboard A4 e link de compartilhamento
+- Tarefa 21: nota por ideia, vinculada ao ID da validação
+- fix-02: aviso visual ao copiar link
+- fix-03: pipeline de evolução em todos os relatórios
+
+### O que falta
+
+- [Alta] Coleta real de concorrentes e reclamações
+- [Alta] Vínculo automático entre ideia e evidência na hora de coletar
+- [Média] Publicação do serviço, hoje sem controle de acesso
+- [Média] Extração de reclamações
+- [Baixa] Integração com LLM e RAG
+- [Baixa] Relatório que compare mais de uma validação
+- [Baixa] Backup dos dados de execução e `.env`
+
+### Decisões tomadas
+
+- **Nota por ideia**, vinculada ao `id` da validação, em vez da nota global
+- **Veredito conservador**: 0-1 `PARAR`, 2-3 `MUDAR_O_RECORTE`, 4-5 `SEGUIR`, com as faixas
+  calculadas por proporção da escala
+- **Relatório em HTML A4, sem PDF no servidor e sem Puppeteer**; o PDF sai do navegador
+- **Uma única dependência**, `express`
+- **Cada critério devolve `pontos`, `maximo` e `detalhe`**, e `total` e `maximo_possivel` são
+  somas
+- **Documentação no mesmo commit** de toda tarefa de código, e **pendência relatada entra
+  neste arquivo** na mesma tarefa
+- **Convenção de nomes**: `tarefa-NN` para código, `doc-NN` para documentação, `fix-NN` para
+  correções
+
+O motivo de cada decisão está na seção "Decisões tomadas e por quê".
+
+### Pendências conhecidas
+
+- **Comando `memory` inexistente**, pedido pelo `AGENTS.md`. Alternativa: ler este arquivo
+- **Sem backup dos `.jsonl`**, que são ignorados pelo Git e vivem só na máquina local
+- **Sem `.env`**, que vai ser necessário quando houver LLM
+- **Link de compartilhamento sem controle de acesso**
+- **`navigator.clipboard` exige contexto seguro**: por HTTP fora de `localhost` a cópia
+  falha
+
+O detalhe de cada uma está no fim deste arquivo, em "Pendências conhecidas".
+
+### Próximo passo
+
+**Tarefa 22 — coletar concorrentes e reclamações de verdade**, com o `id` da validação como
+entrada obrigatória, para que toda evidência coletada já nasça vinculada a uma ideia.
+
 ## Regras do projeto
 
 Estas regras valem para todas as tarefas, a partir da Tarefa 14.

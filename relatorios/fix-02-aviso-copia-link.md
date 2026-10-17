@@ -353,6 +353,94 @@ olhar o nome que foi testado.
 5. **Números da documentação**: não mudaram. O total segue 79 (41 em `server.test.js`, 15 em
    `evidencias.test.js`, 23 em `nota.test.js`), porque nenhuma tarefa foi acrescentada.
 
+## Pipeline de evolução
+
+### Onde estamos
+
+Fase do fluxograma em que a ideia é transformada em um documento que outra pessoa possa
+ler. A régua está completa, o veredito existe, a nota é por ideia e existe link de
+compartilhamento. Esta correção foi o detalhe de usabilidade do painel: o botão de copiar
+agora confirma o que fez.
+
+### O que foi feito até aqui
+
+- Tarefa 01: inspeção do ambiente (relatório reconstruído na Tarefa 09)
+- Tarefa 02: endpoint `POST /validar-ideia`
+- Tarefa 03: classificação determinística mobile/outro
+- Tarefa 04: persistência em JSON Lines
+- Tarefa 05: módulo `evidencias.js`
+- Tarefa 06: unificação em uma única implementação
+- Tarefa 07: remoção da duplicata `app/`
+- Tarefa 08: organização para portfólio
+- Tarefa 09: limpeza estrutural, injeção de caminho e `.gitattributes`
+- Tarefa 10: atualização do `ESTADO.md` e migração para o GitHub
+- Tarefa 11: `POST /evidencias` e `GET /evidencias`
+- Tarefa 12: documentação das rotas de evidências
+- Tarefa 13: primeiro critério da régua ("tem gente?")
+- Tarefa 14: regras do projeto e convenção de nomes de relatório
+- Tarefa 15: segundo critério ("tem gente insatisfeita?") e soma dos pontos
+- fix-01: `405` em `/nota` e teste de `405` em `/evidencias`
+- Tarefa 16: terceiro critério ("cabe mais um?")
+- Tarefa 17: quarto critério ("alguém paga?") e tipo `monetizacao`
+- Tarefa 18: quinto critério ("você alcança essas pessoas?") e tipo `alcance`
+- Tarefa 19: veredito derivado da nota
+- Tarefa 20: dashboard A4 e link de compartilhamento
+- Tarefa 21: nota por ideia, vinculada ao ID da validação
+- fix-02: aviso visual ao copiar link
+- fix-03: pipeline de evolução em todos os relatórios
+
+### O que falta
+
+- [Alta] Coleta real de concorrentes e reclamações. É o último grande bloco do fluxograma e
+  o que falta para a nota se apoiar em dado de verdade, em vez de evidência digitada à mão.
+- [Alta] Vínculo automático entre ideia e evidência na hora de coletar. Hoje o
+  `id_validacao` depende do cliente repassar.
+- [Média] Publicação do serviço. O relatório não tem controle de acesso: qualquer pessoa com
+  o link abre.
+- [Média] Extração de reclamações, que é a fonte do critério "tem gente insatisfeita?".
+- [Baixa] Integração com LLM e RAG.
+- [Baixa] Relatório que compare mais de uma validação.
+- [Baixa] Backup dos dados de execução e `.env`, ambos de infraestrutura.
+
+### Decisões tomadas
+
+- **Nota por ideia**, vinculada ao `id` da validação, em vez da nota global. Corrigiu um
+  erro de produto e eliminou a heurística que comparava o texto da ideia.
+- **Veredito conservador**: 0-1 `PARAR`, 2-3 `MUDAR_O_RECORTE`, 4-5 `SEGUIR`. As faixas são
+  calculadas por proporção da escala, não fixas no código.
+- **Nota geral continua disponível** em `GET /nota` sem `?id=`, para material que não
+  pertence a uma ideia específica.
+- **Relatório em HTML A4, sem PDF no servidor e sem Puppeteer.** O PDF sai do navegador. É o
+  que mantém o projeto com uma única dependência, `express`.
+- **Cada critério tem `pontos`, `maximo` e `detalhe`**, e `total` e `maximo_possivel` são
+  somas. Acrescentar critério não exige mexer no cálculo.
+- **Regra do projeto**: toda tarefa de código atualiza `README.md` e `ESTADO.md` no mesmo
+  commit, e toda pendência relatada entra no `ESTADO.md` na mesma tarefa.
+- **Convenção de nomes**: `tarefa-NN` para código, `doc-NN` para documentação, `fix-NN` para
+  correções.
+
+O detalhamento completo está em `ESTADO.md`.
+
+### Pendências conhecidas
+
+- **Comando `memory` inexistente**: o `AGENTS.md` pede
+  `memory --action read --target daily`, que não existe neste ambiente. Alternativa
+  disponível: ler o `ESTADO.md`. Origem: registro da Tarefa 08.
+- **Sem backup dos `.jsonl`**: os dados de execução são ignorados pelo Git e existem só na
+  máquina local. Falta o script para rodar via `cron` na VPS. Origem: Tarefa 08.
+- **Sem `.env`**: quando a integração com LLM acontecer, faltará o arquivo de variáveis e o
+  `.env.example`. O `.gitignore` já está preparado para versionar o exemplo. Origem:
+  Tarefa 08.
+- **Link de compartilhamento sem controle de acesso**: qualquer pessoa com o link abre o
+  relatório. Origem: Tarefa 20.
+- **`navigator.clipboard` exige contexto seguro**: por HTTP fora de `localhost` a cópia
+  falha, e o usuário vê o aviso vermelho pedindo para copiar manualmente. Origem: fix-02.
+
+### Próximo passo
+
+**Tarefa 22 — coletar concorrentes e reclamações de verdade**, com o `id` da validação como
+entrada obrigatória, para que toda evidência coletada já nasça vinculada a uma ideia.
+
 ## Confirmação de existência e tamanho deste relatório
 
 Comandos executados e saída real:
