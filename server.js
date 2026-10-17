@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const { randomUUID } = require('crypto');
 
 const {
   registrarEvidencia,
@@ -60,9 +61,13 @@ function validarIdeia(corpo) {
   return { ok: true, ideia };
 }
 
-// Gera um id único de validação: timestamp em ms + sufixo aleatório.
+// Gera o id de uma validação.
+// É um UUID v4: 122 bits de entropia vinda de fonte criptográfica. Antes era
+// "<timestamp em ms>-<6 caracteres>", e o timestamp monotônico permitia adivinhar
+// o id por força bruta com muito menos tentativas — o id aparece na URL do
+// relatório, que é o caminho que o atacante percorre.
 function gerarId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return randomUUID();
 }
 
 // Grava uma validação bem-sucedida em JSON Lines (append).

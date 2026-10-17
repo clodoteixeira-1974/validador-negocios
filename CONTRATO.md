@@ -29,8 +29,21 @@ Gravada em `validacoes.jsonl`. É a unidade que o relatório consegue reabrir pe
 | `tipo` | string | sim | servidor, `classificarTipo()` | resposta; relatório |
 | `timestamp` | string ISO 8601 | sim | servidor, `new Date().toISOString()` | relatório, formatado em pt-BR |
 
-Formato do `id`: `<timestamp em ms>-<6 caracteres base36>`, por exemplo
-`1792236286947-kv0fp9`.
+Formato do `id`: **UUID versão 4**, por exemplo
+`550e8400-e29b-41d4-a716-446655440000`. São 36 caracteres, em formato hexadecimal
+separado por hífen, com o terceiro bloco começando em `4` e o quarto em `8`, `9`, `a` ou `b`.
+
+Gerado por `crypto.randomUUID()`, que usa 122 bits de entropia vinda de fonte
+criptográfica. O formato anterior era `<timestamp em ms>-<6 caracteres base36>`, e o
+timestamp monotônico permitia adivinhar o `id` por força bruta com muito menos tentativas.
+
+O `id` **aparece na URL** do relatório, em `/relatorio/:id`. É por isso que ele precisa
+ser adivinhável apenas por força bruta. Ele não é segredo: quem tem o link abre o
+relatório, e **o relatório não tem controle de acesso**.
+
+O `id` da **Evidência** segue outro formato, `<timestamp em ms>-<6 caracteres base36>`, e
+continua vindo de `gerarId()` dentro de `evidencias.js`. Ele não aparece em URL e não é
+usado como chave de acesso.
 
 ## Evidência
 

@@ -168,8 +168,10 @@ dados de verdade e o relatório final ainda não existem.
   copiar o link do relatório. O painel consulta a nota da ideia, com `?id=`
 - Endpoint `GET /relatorio/:id`: relatório HTML em folha A4, com a ideia, a data, a nota, o
   veredito, os cinco critérios e as evidências relacionadas. Sem JavaScript
-- Cada validação recebe um `id` (timestamp + aleatório), devolvido na resposta de
-  `POST /validar-ideia` e que dá acesso ao relatório
+- Cada validação recebe um `id` que é um **UUID v4**, com 122 bits de entropia
+  criptográfica, devolvido na resposta de `POST /validar-ideia`. Ele dá acesso ao relatório
+  e não é mais adivinhável por timestamp: o formato antigo, `<ms>-<6 caracteres>`, permitia
+  forçar o link com muito menos tentativas
 - Módulo `relatorio.js` gera as duas páginas, com o CSS embutido e sem recurso externo.
   Sem dependência de PDF e sem Puppeteer: o PDF sai do navegador, por "Salvar como"
 - Endpoint `GET /nota` (a régua inteira: cinco critérios — "tem gente?", "tem gente
@@ -190,7 +192,7 @@ dados de verdade e o relatório final ainda não existem.
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 88 testes automatizados (46 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
+- 92 testes automatizados (50 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
   `nota.test.js`)
 - **Leitura de `.jsonl` resiliente e unificada**: `validacoes.jsonl` e `evidencias.jsonl` são
   lidos pela mesma função, em `jsonl.js`. Linha corrompida é ignorada com aviso em
@@ -239,7 +241,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 
 - Servidor: não está rodando. Para iniciar: `npm start`
 - Porta padrão: 3000 (configurável via `PORT`)
-- Testes: `npm test` (88 passando)
+- Testes: `npm test` (92 passando)
 - Repositório GitHub: https://github.com/clodoteixeira-1974/validador-negocios
 - Branch principal: `main`
 
@@ -248,7 +250,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 88 testes automatizados
+npm test        # roda os 92 testes automatizados
 ```
 
 Exemplos de chamada:
@@ -307,5 +309,7 @@ Permanecem em aberto, todas de ambiente ou de infraestrutura, nenhuma de código
   arquivos `.jsonl` são ignorados pelo Git, isso não afeta quem clonar o repositório: a
   correção só vale para os dados gravados a partir daqui.
 - **Link de compartilhamento sem controle de acesso**: qualquer pessoa com o link abre o
-  relatório. Não há autenticação nem segredo na URL. Se o relatório passar a conter dado
-  sensível, isso precisa ser resolvido antes.
+  relatório, e não há autenticação nem segredo na URL. O `id` agora é um UUID v4, o que
+  **fez o ataque por força bruta caro de tentar**, mas **não controle o acesso**: o link
+  continua sendo a única proteção, e quem o tem, tem o relatório. Se o relatório passar a
+  conter dado sensível, isso precisa ser resolvido antes.

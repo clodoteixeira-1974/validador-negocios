@@ -73,7 +73,10 @@ escolha mantém o projeto com uma única dependência.
 - **`/dashboard`** — formulário para enviar a ideia, resultado na tela e botão para copiar o
   link do relatório.
 - **`/relatorio/:id`** — relatório daquela validação, com a ideia, a data, a nota, o
-  veredito, o detalhamento dos cinco critérios e as evidências relacionadas.
+  veredito, o detalhamento dos cinco critérios e as evidências relacionadas. O `id` na URL é
+  um UUID v4, gerado com entropia criptográfica: ele é adivinhável só por força bruta.
+
+Quem tem o link abre o relatório. **Não há controle de acesso, e o link é a única proteção.**
 
 O CSS é embutido nas duas páginas e não carrega fonte, imagem ou biblioteca externa. A
 folha está dimensionada para A4 com margem de 2 cm, e as regras de impressão escondem botões
@@ -108,7 +111,7 @@ Para rodar os testes:
 npm test
 ```
 
-São 88 testes automatizados, todos passando.
+São 92 testes automatizados, todos passando.
 
 Dois exemplos de chamada:
 
@@ -179,7 +182,7 @@ curl http://localhost:3000/nota
 | Método | Rota               | Resposta                                                                                             |
 | ------ | ------------------ | --------------------------------------------------------------------------------------------------- |
 | GET    | `/saude`           | `200` com `{"ok": true, "servico": "validador-negocios"}` — verificação de que o serviço está no ar   |
-| POST   | `/validar-ideia`   | `200` com `recebido`, `id`, `ideia`, `tipo` e `timestamp` quando a ideia é válida. O `id` dá acesso ao relatório |
+| POST   | `/validar-ideia`   | `200` com `recebido`, `id`, `ideia`, `tipo` e `timestamp` quando a ideia é válida. O `id` é um UUID v4 e dá acesso ao relatório |
 | POST   | `/validar-ideia`   | `400` com `{"error": "..."}` quando o campo `ideia` falta, está vazio ou não é texto                 |
 | POST   | `/validar-ideia`   | `413` quando o corpo do pedido passa de 100 KB                                                       |
 | POST   | `/validar-ideia`   | `400` com `{"error": "JSON invalido"}` quando o corpo enviado não é um JSON bem formado              |
@@ -255,7 +258,7 @@ decisão, e é descrito na seção seguinte.
 | Arquivo                             | Função                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `server.js`                         | O serviço. Recebe requisições, valida, classifica, grava e devolve as respostas.                         |
-| `server.test.js`                    | 46 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
+| `server.test.js`                    | 50 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
 | `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações, dados de mercado, monetização e alcance. |
 | `evidencias.test.js`                | 19 testes do módulo de evidências, também com arquivos temporários.                                      |
 | `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua e deriva o veredito.                           |
@@ -282,7 +285,7 @@ Fase avançada: o serviço de validação e classificação está funcionando, a
 completa com os cinco critérios, cada nota vem com um veredito, e a nota é **por ideia**:
 as evidências se vinculam ao identificador da validação, e o relatório mostra a nota
 correta daquela ideia. Há um dashboard em HTML que gera um relatório A4 com link para
-compartilhar. São 88 testes automatizados, todos passando.
+compartilhar. São 92 testes automatizados, todos passando.
 
 O que ainda falta: coletar concorrentes e reclamações de verdade, e publicar o serviço.
 

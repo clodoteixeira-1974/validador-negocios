@@ -4,7 +4,18 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { createApp, classificarTipo, ARQUIVO_VALIDACOES, ARQUIVO_EVIDENCIAS } = require('./server');
+const {
+  createApp,
+  classificarTipo,
+  gerarId,
+  ARQUIVO_VALIDACOES,
+  ARQUIVO_EVIDENCIAS
+} = require('./server');
+
+// Formato do id de validação: UUID versão 4, como documentado em CONTRATO.md.
+// O terceiro bloco começa com 4 e o quarto com 8, 9, a ou b, que é o que
+// distingue a versão 4 dentro do padrão de UUID.
+const REGEX_UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // Cada teste sobe o servidor em uma porta efêmera (listen(0)) e grava em arquivos
 // temporários. Os .jsonl de produção nunca são tocados.
@@ -110,14 +121,14 @@ test('ideia mobile: 200 com tipo "mobile" e gravacao no arquivo temporario', asy
 
     // A resposta traz o id gerado, que é o que dá acesso ao relatório.
     assert.notEqual(r.corpo.id, '');
-    assert.match(r.corpo.id, /^\d+-[a-z0-9]+$/);
+    assert.match(r.corpo.id, REGEX_UUID_V4);
 
     const linhas = lerLinhas(arquivo);
     assert.equal(linhas.length, 1);
 
     const gravado = JSON.parse(linhas[0]);
     assert.notEqual(gravado.id, '');
-    assert.match(gravado.id, /^\d+-[a-z0-9]+$/);
+    assert.match(gravado.id, REGEX_UUID_V4);
     assert.equal(gravado.id, r.corpo.id);
 
     assert.deepEqual(
@@ -708,7 +719,7 @@ test('POST /validar-ideia: a resposta inclui o id que dá acesso ao relatório',
       assert.equal(r.status, 200);
       assert.equal(r.corpo.recebido, true);
       assert.equal(typeof r.corpo.id, 'string');
-      assert.match(r.corpo.id, /^\d+-[a-z0-9]+$/);
+      assert.match(r.corpo.id, REGEX_UUID_V4);
     }
 
     // Cada validação recebe um id próprio.
@@ -1028,6 +1039,62 @@ test('relatório e nota abrem mesmo com os dois arquivos corrompidos', async () 
     const evidencias = await getEvidencias(base);
     assert.equal(evidencias.status, 200);
     assert.equal(evidencias.corpo.total, 0);
+  });
+});
+
+test('gerarId devolve um UUID v4, no formato documentado no contrato', () => {
+  for (let i = 0; i < 200; i++) {
+    const id = gerarId();
+
+    assert.match(id, REGEX_UUID_V4);
+    assert.equal(typeof id, 'string');
+    assert.equal(id.length, 36);
+  }
+});
+
+test('dois ids gerados em sequência são diferentes', () => {
+  const ids = [];
+
+  for (let i = 0; i < 500; i++) {
+    ids.push(gerarId());
+  }
+
+  assert.equal(ids.length, 500);
+  assert.equal(new Set(ids).size, 500, 'nenhum id pode se repetir');
+});
+
+test('o id não carrega timestamp: não começa com 13 dígitos nem com data', () => {
+  for (let i = 0; i < 100; i++) {
+    const id = gerarId();
+
+    // O formato antigo era "<Date.now()>-<aleatório>", começando por 13 dígitos.
+    assert.ok(!/^\d{13}/.test(id), id);
+
+    // E nenhum dos cinco blocos é um número puro de 13 dígitos.
+    for (const bloco of id.split('-')) {
+      assert.ok(!/^\d{13}$/.test(bloco), bloco);
+    }
+  }
+});
+
+test('o link do relatório funciona com o id em formato UUID', async () => {
+  await comServidor(async ({ base }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+
+    // O id novo aparece cru na URL, sem nenhum caractere que precise de escape.
+    const url = `${base}/relatorio/${validacao.corpo.id}`;
+    assert.ok(!url.includes('%'), 'o id não deve precisar de encode');
+
+    const resposta = await fetch(url);
+    const corpo = await resposta.text();
+
+    assert.equal(resposta.status, 200);
+    assert.ok(corpo.includes(validacao.corpo.id));
+    assert.match(corpo, /App para controlar gastos/);
+
+    // Um id com a mesma forma, mas que não existe, continua devolvendo 404.
+    const inexistente = await fetch(`${base}/relatorio/${gerarId()}`);
+    assert.equal(inexistente.status, 404);
   });
 });
 
