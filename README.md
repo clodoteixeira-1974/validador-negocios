@@ -9,17 +9,21 @@ Repositório: https://github.com/clodoteixeira-1974/validador-negocios
 
 ## O que faz
 
-Hoje, o serviço faz quatro coisas:
+Hoje, o serviço faz cinco coisas:
 
 1. **Valida a ideia.** Você envia uma ideia em texto. O servidor confere se o pedido está
    bem formado e devolve uma resposta clara, seja aceito ou recusado.
-2. **Classifica o tipo.** Se a ideia menciona "app" ou "aplicativo" como palavra isolada,
+2. **Recebe uma imagem opcional.** No dashboard, é possível enviar uma imagem de até 10 MB
+   em vez de digitar a descrição. O OpenRouter extrai o texto da imagem; esse texto segue
+   para a classificação e as demais etapas. A imagem é preservada no registro e exibida no
+   relatório A4.
+3. **Classifica o tipo.** Se a ideia menciona "app" ou "aplicativo" como palavra isolada,
    ela é classificada como `mobile`. Caso contrário, como `outro`. A comparação usa limite de
    palavra, então "pineapple", "happy" e "AppStore" continuam sendo `outro`, porque nelas
    "app" não é uma palavra separada.
-3. **Guarda evidências de mercado.** É possível registrar concorrentes, reclamações de
+4. **Guarda evidências de mercado.** É possível registrar concorrentes, reclamações de
    usuários e dados de setor, e depois listar tudo o que foi registrado.
-4. **Dá uma nota de viabilidade.** A nota é calculada a partir das evidências registradas,
+5. **Dá uma nota de viabilidade.** A nota é calculada a partir das evidências registradas,
    aplicando um critério de cada vez e explicando como cada um chegou ao resultado.
 
 Cada validação aceita é gravada em um arquivo de registro com a ideia, o tipo e a data e
@@ -115,9 +119,10 @@ data, e o rodapé desses relatórios avisa que não há prazo.
 Isso encurta a janela de exposição de um link vazado, mas **não é controle de acesso**:
 quem tem o link tem o acesso enquanto ele valer, e não há como revogar antes do prazo.
 
-O CSS é embutido nas duas páginas e não carrega fonte, imagem ou biblioteca externa. A
-folha está dimensionada para A4 com margem de 2 cm, e as regras de impressão escondem botões
-e painéis, de modo que "Imprimir" sai limpo.
+O CSS é embutido nas duas páginas e não carrega fonte, biblioteca ou imagem externa. A imagem
+enviada é incorporada como data URI no relatório. A folha está dimensionada para A4 com
+margem de 2 cm, e as regras de impressão escondem botões e painéis, de modo que "Imprimir"
+sai limpo.
 
 O projeto foi construído em etapas pequenas, cada uma com testes automatizados e um
 relatório em `relatorios/` explicando o que foi feito e por quê.
@@ -209,7 +214,27 @@ Para rodar os testes:
 npm test
 ```
 
-São 105 testes automatizados, todos passando.
+São 120 testes automatizados, todos passando.
+
+### Envio de imagem e OpenRouter
+
+O dashboard aceita um arquivo `image/*` ou uma descrição digitada. A pré-visualização é
+mostrada antes do envio. Imagens devem ter no máximo 10 MB após decodificação; o servidor
+converte a imagem em descrição com a API OpenRouter, sem usar o modelo para classificar a
+ideia ou calcular a nota.
+
+Configure `OPENROUTER_API_KEY` no ambiente antes de iniciar o servidor. O arquivo
+`.env.example` documenta as variáveis, mas o projeto não carrega `.env` automaticamente.
+`OPENROUTER_MODEL` é opcional e, se ausente, usa
+`nvidia/nemotron-nano-12b-v2-vl:free`.
+
+PowerShell:
+
+```powershell
+$env:OPENROUTER_API_KEY="sua_chave"
+$env:OPENROUTER_MODEL="nvidia/nemotron-nano-12b-v2-vl:free"
+npm start
+```
 
 Dois exemplos de chamada:
 
@@ -361,7 +386,7 @@ decisão, e é descrito na seção seguinte.
 | Arquivo                             | Função                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `server.js`                         | O serviço. Recebe requisições, valida, classifica, grava e devolve as respostas.                         |
-| `server.test.js`                    | 63 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
+| `server.test.js`                    | 78 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
 | `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações, dados de mercado, monetização e alcance. |
 | `evidencias.test.js`                | 19 testes do módulo de evidências, também com arquivos temporários.                                      |
 | `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua e deriva o veredito.                           |
@@ -388,7 +413,7 @@ Fase avançada: o serviço de validação e classificação está funcionando, a
 completa com os cinco critérios, cada nota vem com um veredito, e a nota é **por ideia**:
 as evidências se vinculam ao identificador da validação, e o relatório mostra a nota
 correta daquela ideia. Há um dashboard em HTML que gera um relatório A4 com link para
-compartilhar. São 105 testes automatizados, todos passando.
+compartilhar. São 120 testes automatizados, todos passando.
 
 O serviço é **público e de portfólio**, com isso avisado na própria interface: banner no
 dashboard, aviso de que os dados são de demonstração, aviso de que a qualidade da nota
@@ -403,7 +428,9 @@ O que ainda falta: coletar concorrentes e reclamações de verdade, e publicar o
 - Coletar concorrentes reais e extrair reclamações de usuários
 - Publicar o serviço e o dashboard
 - Ligar a coleta de evidências ao id da validação automaticamente
-- Avaliar limite de taxa nas rotas de escrita, agora que o serviço é público
+
+O registro da pendência **"Integrar imagem com LLM para extrair descrição da ideia
+automaticamente"** fica aqui como histórico; ela foi resolvida no fix-11.
 
 O detalhamento do que falta, das decisões já tomadas e do próximo passo imediato está em
 `ESTADO.md`.

@@ -18,7 +18,7 @@ Quem valida o quê está em **Passagem de bastão**, mais abaixo. O formato dos 
 Fase de exposição do produto: o serviço está funcional de ponta a ponta, com nota por ideia,
 relatório A4 e link de compartilhamento. O PO decidiu que ele é **público e de portfólio**,
 então o produto se declara na própria interface e o link passa a ter prazo. Falta o dado
-real, e falta proteger as rotas de escrita.
+real, e as rotas de escrita continuam sem autenticação, apesar do limite de taxa.
 
 ### O que foi feito até aqui
 
@@ -53,6 +53,7 @@ real, e falta proteger as rotas de escrita.
 - fix-08: disclaimers, expiração de links e vitrine de portfólio
 - fix-09: expiracao em `GET /evidencias?id=`
 - Tarefa 26: limite de taxa por IP nas rotas caras, em `rate-limit.js`
+- fix-11: upload de imagem e extração da descrição com OpenRouter, sem alterar a régua de nota
 
 ### Decisões do PO sobre acesso e apresentação
 
@@ -83,7 +84,7 @@ só, e nenhum placeholder chegou ao HTML.
 - [Baixa] Link do perfil do autor no rodapé: hoje aponta para o perfil no GitHub, e não para
   um site pessoal
 - [Baixa] Migração das validações antigas para `expires_at`. Hoje elas não expiram
-- [Baixa] Integração com LLM e RAG
+- [Baixa] RAG e outras análises de mercado com LLM; o uso atual do OpenRouter limita-se à extração de texto de imagem
 - [Baixa] Relatório que compare mais de uma validação
 - [Baixa] Backup dos dados de execução e `.env`
 - [Baixa] Classificação de tipo ainda é por palavra-chave. O limite de palavra corrigiu o falso
@@ -113,9 +114,13 @@ O motivo de cada decisão está na seção "Decisões tomadas e por quê".
 
 ### Pendências conhecidas
 
+- **Pendência resolvida no fix-11:** "Integrar imagem com LLM para extrair descrição da ideia automaticamente".
+
 - **Comando `memory` inexistente**, pedido pelo `AGENTS.md`. Alternativa: ler este arquivo
 - **Sem backup dos `.jsonl`**, que são ignorados pelo Git e vivem só na máquina local
-- **Sem `.env`**, que vai ser necessário quando houver LLM
+- **Configuração local da chave OpenRouter**: defina `OPENROUTER_API_KEY` no ambiente para
+  usar imagens. O `.env.example` documenta as variáveis, mas `.env` não é carregado
+  automaticamente.
 - **Limite de taxa é por processo e em memória**: com duas instâncias atrás de balanceador, o
   teto efetivo dobra. Atrás de proxy sem `trust proxy`, todo mundo divide o balde do proxy.
   `GET /saude` precisa ficar ilimitada para o balanceador continuar funcionando
@@ -186,8 +191,8 @@ O Validador de Novos Negócios é um serviço HTTP que recebe a descrição de u
 negócio, classifica o tipo dela e registra a validação com data e hora. Ele também recebe
 e lista evidências de mercado (concorrentes, reclamações de usuários e dados de setor) e
 calcula uma nota de viabilidade a partir delas. Hoje ele valida, classifica, guarda as
-evidências e aplica a régua inteira, com cinco critérios, e deriva o veredito; a coleta de
-dados de verdade e o relatório final ainda não existem.
+evidências, aplica a régua inteira com cinco critérios, deriva o veredito e gera um relatório
+HTML A4. A descrição pode ser digitada ou extraída de uma imagem via OpenRouter.
 
 ## O que existe hoje
 
@@ -202,9 +207,10 @@ dados de verdade e o relatório final ainda não existem.
   heurística anterior, que associava evidências por comparação do texto da ideia, foi
   removida por ser frágil
 - Endpoint `GET /dashboard`: página HTML com formulário de ideia, resultado e botão de
-  copiar o link do relatório. O painel consulta a nota da ideia, com `?id=`
+  copiar o link do relatório. Aceita imagem com pré-visualização e consulta a nota da ideia,
+  com `?id=`
 - Endpoint `GET /relatorio/:id`: relatório HTML em folha A4, com a ideia, a data, a nota, o
-  veredito, os cinco critérios e as evidências relacionadas. Sem JavaScript
+  veredito, os cinco critérios, a imagem opcional e as evidências relacionadas. Sem JavaScript
 - Cada validação recebe um `id` que é um **UUID v4**, com 122 bits de entropia
   criptográfica, devolvido na resposta de `POST /validar-ideia`. Ele dá acesso ao relatório
   e não é mais adivinhável por timestamp: o formato antigo, `<ms>-<6 caracteres>`, permitia
@@ -229,7 +235,7 @@ dados de verdade e o relatório final ainda não existem.
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 113 testes automatizados (71 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
+- 120 testes automatizados (78 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
   `nota.test.js`)
 - **Leitura de `.jsonl` resiliente e unificada**: `validacoes.jsonl` e `evidencias.jsonl` são
   lidos pela mesma função, em `jsonl.js`. Linha corrompida é ignorada com aviso em
@@ -261,6 +267,9 @@ dados de verdade e o relatório final ainda não existem.
   no mesmo balde. `X-Forwarded-For` é ignorado de propósito, para não ser burlado- **Aviso no relatório** de que as evidências vêm de usuários e não há verificação de fonte
   automática, seguido da data de expiração do link
 - **Página de link expirado** em HTML simples, sem o CSS pesado do relatório
+- **Upload de imagem opcional** no dashboard: data URI limitada a 10 MB após decodificação,
+  pré-visualizada no navegador e armazenada com a validação. `OPENROUTER_API_KEY` é lida do
+  ambiente; `OPENROUTER_MODEL` usa `nvidia/nemotron-nano-12b-v2-vl:free` como fallback.
 
 ## O que não existe ainda
 
@@ -269,11 +278,9 @@ Alinhado ao fluxograma do projeto:
 - Coleta real de concorrentes
 - Extração de reclamações
 - Vínculo automático entre uma ideia e suas evidências na hora de coletar
-- Integração com LLM
-- RAG
-- Frontend
+- RAG e análises de mercado com LLM (o OpenRouter atual é usado somente para extração de texto de imagem)
+- Frontend além do dashboard HTML atual
 - Deploy
-- **Limite de taxa nas rotas de escrita**, que virou pendência com a decisão de publicar
 - **Autenticação ou revogação de link**, que a decisão do PO adiou para depois da validade
 
 ## Decisões tomadas e por quê
@@ -313,13 +320,14 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
   Hoje os dados de execução existem apenas na máquina local e são ignorados pelo Git.
 - **Ajuste do `AGENTS.md`**: remover a dependência do comando `memory`, que não existe
   neste ambiente, e passar a usar a leitura deste arquivo como memória de trabalho.
-- **Configuração de `.env`** para as chaves de API, quando a LLM for integrada.
+- **Configuração de `OPENROUTER_API_KEY` no ambiente de deploy** para habilitar o envio de
+  imagem em produção.
 
 ## Estado atual
 
 - Servidor: não está rodando. Para iniciar: `npm start`
 - Porta padrão: 3000 (configurável via `PORT`)
-- Testes: `npm test` (92 passando)
+- Testes: `npm test` (120 passando)
 - Repositório GitHub: https://github.com/clodoteixeira-1974/validador-negocios
 - Branch principal: `main`
 
@@ -328,7 +336,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 113 testes automatizados
+npm test        # roda os 120 testes automatizados
 ```
 
 Exemplos de chamada:
@@ -354,23 +362,9 @@ Para usar outra porta: `PORT=8080 npm start` (Linux/macOS) ou
 
 ## Próximo passo
 
-**Tarefa 26 — limite de taxa nas rotas de escrita.** A decisão do PO resolveu a questão de
-acesso pelo caminho da transparência, e foi a decisão certa para portfólio. Mas ela deixou
-um buraco que não é de acesso e sim de disponibilidade: sem limite, qualquer pessoa pode
-fazer laço de `POST /validar-ideia` ou `POST /evidencias`, encher o disco e travar o event
-loop, porque o I/O é síncrono. Aviso não protege ninguém disso.
-
-A ordem faz sentido porque limite de taxa é o que torna a publicação segura sem
-autenticação. Sem ele, "público" significa "disponível para ser derrubado".
-
-**O PO já decidiu sobre essa brecha.** Ele aprovou o fechamento de `GET /evidencias?id=`,
-e é o que o fix-09 fez. A expiração agora cobre as três rotas que aceitam `id` de
-validação, e não existe leitura de dado de validação que escape do prazo.
-
-Depois, a Tarefa 22 segue na fila: coletar concorrentes e reclamações de verdade, com o `id`
-da validação como entrada obrigatória. As perguntas de produto e de conduta continuam as
-mesmas: de onde vêm os dados, com que frequência, se o coletor pode fazer requisição aos
-sites consultados, e se a pessoa valida a evidência antes de ela entrar no relatório.
+**Tarefa 22 — coletar concorrentes e reclamações de verdade**, com o `id` da validação como
+entrada obrigatória, para que toda evidência coletada já nasça vinculada a uma ideia. Definir
+fontes, frequência de coleta e validação humana antes de incorporar evidências ao relatório.
 
 ## Pendências conhecidas
 
@@ -381,8 +375,12 @@ Permanecem em aberto, todas de ambiente ou de infraestrutura, nenhuma de código
   disponível: ler o `ESTADO.md`, que é o que este arquivo é.
 - **Sem backup dos `.jsonl`**: os dados de execução são ignorados pelo Git e existem só na
   máquina local. Falta o script para rodar via `cron` na VPS.
-- **Sem `.env`**: quando a integração com LLM acontecer, faltará o arquivo de variáveis de
-  ambiente e o `.env.example`. O `.gitignore` já está preparado para versionar o exemplo.
+- **A chave `OPENROUTER_API_KEY` precisa ser configurada no ambiente** para usar imagem. O
+  `.env.example` documenta as variáveis, mas o servidor não carrega `.env` automaticamente.
+- **A chamada ao OpenRouter não tem timeout configurado**: se a API demorar, a requisição
+  aguarda até receber uma resposta ou erro de rede.
+- **A imagem é armazenada em Base64 no JSONL**: cada validação com imagem ocupa espaço
+  proporcional ao arquivo enviado, sem compressão nem política de retenção separada.
 - **Nota por ideia depende de o cliente enviar `id_validacao`**: o vínculo existe e é o
   que corrige o relatório, mas nada o preenche sozinho. Quem integra o serviço precisa
   validar a ideia, guardar o id devolvido e repassá-lo em cada evidência. Evidências sem

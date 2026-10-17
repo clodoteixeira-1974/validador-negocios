@@ -24,10 +24,10 @@ function arquivoTemporario(prefixo = 'validacoes') {
   return path.join(os.tmpdir(), `${prefixo}-teste-${sufixo}.jsonl`);
 }
 
-async function comServidor(fn) {
+async function comServidor(fn, opcoes = {}) {
   const arquivo = arquivoTemporario('validacoes');
   const arquivoEvidencias = arquivoTemporario('evidencias');
-  const app = createApp({ arquivoValidacoes: arquivo, arquivoEvidencias });
+  const app = createApp({ arquivoValidacoes: arquivo, arquivoEvidencias, ...opcoes });
 
   // app.listen() devolve o servidor HTTP; é nele que ficam listen/address/close
   const servidor = app.listen(0);
@@ -146,6 +146,133 @@ test('ideia mobile: 200 com tipo "mobile" e gravacao no arquivo temporario', asy
   });
 });
 
+test('imagem valida: extrai a descricao pelo OpenRouter e grava imagem_base64', async () => {
+  const imagem = 'data:image/png;base64,aGVsbG8=';
+  let chamada;
+
+  await comServidor(async ({ base, arquivo }) => {
+    const r = await post(base, { imagem_base64: imagem });
+
+    assert.equal(r.status, 200);
+    assert.equal(r.corpo.ideia, 'App para organizar receitas');
+    assert.equal(r.corpo.tipo, 'mobile');
+    assert.equal(chamada.url, 'https://openrouter.ai/api/v1/chat/completions');
+    assert.equal(chamada.opcoes.headers.Authorization, 'Bearer chave-de-teste');
+    assert.equal(chamada.opcoes.headers['Content-Type'], 'application/json');
+
+    const pedido = JSON.parse(chamada.opcoes.body);
+    assert.equal(pedido.model, 'modelo-de-teste');
+    assert.deepEqual(pedido.messages[0].content, [
+      {
+        type: 'text',
+        text: 'Extraia a descricao da ideia de negocio contida nesta imagem. Responda apenas com a descricao em texto, sem introducoes.'
+      },
+      { type: 'image_url', image_url: { url: imagem } }
+    ]);
+
+    const registro = JSON.parse(lerLinhas(arquivo)[0]);
+    assert.equal(registro.imagem_base64, imagem);
+    assert.equal(registro.ideia, 'App para organizar receitas');
+  }, {
+    openRouterApiKey: 'chave-de-teste',
+    openRouterModel: 'modelo-de-teste',
+    fetchOpenRouter: async (url, opcoes) => {
+      chamada = { url, opcoes };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: 'App para organizar receitas' } }]
+        })
+      };
+    }
+  });
+});
+
+test('imagem_base64 com formato errado: 400 e nada gravado', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    const r = await post(base, { ideia: 'Ignorada', imagem_base64: 'texto sem data URI' });
+
+    assert.equal(r.status, 400);
+    assert.match(r.corpo.error, /^Imagem invalida:/);
+    assert.equal(lerLinhas(arquivo).length, 0);
+  });
+});
+
+test('imagem_base64 que nao e string: 400 com erro de imagem', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    const r = await post(base, { imagem_base64: 123 });
+
+    assert.equal(r.status, 400);
+    assert.match(r.corpo.error, /^Imagem invalida:/);
+    assert.equal(lerLinhas(arquivo).length, 0);
+  });
+});
+
+test('imagem_base64 acima de 10 MB decodificados: 400 e nada gravado', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    const conteudo = Buffer.alloc(10 * 1024 * 1024 + 1).toString('base64');
+    const r = await post(base, { imagem_base64: `data:image/png;base64,${conteudo}` });
+
+    assert.equal(r.status, 400);
+    assert.match(r.corpo.error, /^Imagem invalida:/);
+    assert.match(r.corpo.error, /10 MB/);
+    assert.equal(lerLinhas(arquivo).length, 0);
+  });
+});
+
+test('sem imagem_base64: POST /validar-ideia mantém compatibilidade', async () => {
+  await comServidor(async ({ base }) => {
+    const r = await post(base, { ideia: 'Consultoria de marketing' });
+
+    assert.equal(r.status, 200);
+    assert.equal(r.corpo.ideia, 'Consultoria de marketing');
+    assert.equal(r.corpo.tipo, 'outro');
+  });
+});
+
+test('falha do OpenRouter: 400 e nenhuma validacao gravada', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    const r = await post(base, { imagem_base64: 'data:image/png;base64,aGVsbG8=' });
+
+    assert.equal(r.status, 400);
+    assert.match(r.corpo.error, /^Falha ao processar imagem:/);
+    assert.match(r.corpo.error, /servico indisponivel/);
+    assert.equal(lerLinhas(arquivo).length, 0);
+  }, {
+    openRouterApiKey: 'chave-de-teste',
+    fetchOpenRouter: async () => ({
+      ok: false,
+      status: 503,
+      json: async () => ({ error: { message: 'servico indisponivel' } })
+    })
+  });
+});
+
+test('GET /relatorio/:id inclui a imagem salva na validacao', async () => {
+  const imagem = 'data:image/png;base64,aGVsbG8=';
+
+  await comServidor(async ({ base }) => {
+    const validacao = await post(base, { imagem_base64: imagem });
+    assert.equal(validacao.status, 200);
+
+    const resposta = await fetch(`${base}/relatorio/${validacao.corpo.id}`);
+    const html = await resposta.text();
+
+    assert.equal(resposta.status, 200);
+    assert.match(html, /<img class="imagem-validacao" src="data:image\/png;base64,aGVsbG8="/);
+    assert.match(html, /max-width:\s*100%/);
+    assert.match(html, /page-break-inside:\s*avoid/);
+  }, {
+    openRouterApiKey: 'chave-de-teste',
+    fetchOpenRouter: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: 'Ideia extraida da imagem' } }] })
+    })
+  });
+});
+
 test('ideia nao mobile: 200 com tipo "outro"', async () => {
   await comServidor(async ({ base, arquivo }) => {
     const r = await post(base, { ideia: 'Consultoria de marketing' });
@@ -215,12 +342,12 @@ test('JSON malformado: 400 com mensagem em JSON (sem pagina HTML)', async () => 
   });
 });
 
-test('corpo acima de 100kb: 413 e nada gravado', async () => {
+test('corpo de /validar-ideia acima de 14mb: 413 e nada gravado', async () => {
   await comServidor(async ({ base, arquivo }) => {
-    const r = await post(base, { ideia: 'a'.repeat(101 * 1024) });
+    const r = await post(base, { ideia: 'a'.repeat(14 * 1024 * 1024) });
 
     assert.equal(r.status, 413);
-    assert.equal(r.corpo.error, 'Corpo da requisicao excede o limite de 100kb');
+    assert.equal(r.corpo.error, 'Corpo da requisicao excede o limite de 14mb');
     assert.equal(lerLinhas(arquivo).length, 0);
   });
 });
@@ -793,6 +920,9 @@ test('GET /dashboard: 200 com HTML, formulário e botão de copiar', async () =>
     // Formulário para enviar a ideia.
     assert.match(corpo, /<textarea/);
     assert.match(corpo, /id="ideia"/);
+    assert.match(corpo, /<input id="imagem" type="file" accept="image\/\*">/);
+    assert.match(corpo, /readAsDataURL/);
+    assert.match(corpo, /preview-imagem/);
     assert.match(corpo, /Validar ideia/);
 
     // Área de resultado com nota e veredito.

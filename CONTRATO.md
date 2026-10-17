@@ -25,10 +25,17 @@ Gravada em `validacoes.jsonl`. É a unidade que o relatório consegue reabrir pe
 | Campo | Tipo | Obrigatório | Onde é gerado | Onde é consumido |
 | --- | --- | --- | --- | --- |
 | `id` | string | sim | servidor, `gerarId()` | resposta de `POST /validar-ideia`; chave de `GET /relatorio/:id`; valor de `id_validacao` numa evidência; filtro `?id=` |
-| `ideia` | string | sim | cliente | relatório (bloco "A ideia") |
+| `ideia` | string | sim | cliente, ou OpenRouter quando a descrição é extraída de imagem | classificação; relatório (bloco "A ideia") |
+| `imagem_base64` | string (data URI) | não | cliente, `FileReader` no dashboard | extração da descrição via OpenRouter; relatório |
 | `tipo` | string | sim | servidor, `classificarTipo()` | resposta; relatório |
 | `timestamp` | string ISO 8601 | sim | servidor, `new Date().toISOString()` | relatório, formatado em pt-BR |
 | `expires_at` | string ISO 8601 | sim | servidor, `gerarExpiracao()` | verificação de `GET /relatorio/:id`; resposta; rodapé do relatório |
+
+`imagem_base64`, quando enviada, deve começar com `data:image/` e conter a imagem em
+Base64. O tamanho máximo do conteúdo **após decodificação** é 10 MB. O servidor envia a
+imagem ao OpenRouter apenas para extrair a descrição textual da ideia; essa descrição passa
+a ser o valor de `ideia` usado na classificação e nas demais etapas. Sem imagem, a validação
+continua usando o campo `ideia` enviado pelo cliente.
 
 Formato do `id`: **UUID versão 4**, por exemplo
 `550e8400-e29b-41d4-a716-446655440000`. São 36 caracteres, em formato hexadecimal

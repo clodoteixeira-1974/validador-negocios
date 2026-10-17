@@ -180,6 +180,48 @@ textarea {
   background: #fdfdfb;
 }
 
+.entrada-ideia {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.45fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.campo-imagem {
+  min-width: 0;
+}
+
+.campo-imagem input {
+  max-width: 100%;
+}
+
+.preview-imagem {
+  display: block;
+  max-width: 100%;
+  max-height: 220px;
+  margin-top: 10px;
+  page-break-inside: avoid;
+}
+
+.preview-imagem[hidden] {
+  display: none;
+}
+
+.imagem-validacao {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 12px 0 20px;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+@media (max-width: 640px) {
+  .entrada-ideia {
+    grid-template-columns: 1fr;
+  }
+}
+
 button {
   margin-top: 10px;
   padding: 9px 18px;
@@ -438,6 +480,10 @@ function gerarHtmlRelatorio(validacao, nota, evidencias, base) {
       </table>`
     : '<h2>Evidências relacionadas</h2><p class="vazio">Nenhuma evidência registrada para esta ideia.</p>';
 
+  const blocoImagem = validacao.imagem_base64
+    ? `<img class="imagem-validacao" src="${escapar(validacao.imagem_base64)}" alt="Imagem enviada com a ideia">`
+    : '';
+
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -458,6 +504,7 @@ function gerarHtmlRelatorio(validacao, nota, evidencias, base) {
     <dt>Validada em</dt><dd>${escapar(formatarData(validacao.timestamp))}</dd>
     <dt>Identificador</dt><dd>${escapar(validacao.id)}</dd>
   </dl>
+  ${blocoImagem}
 
   <h2>Nota</h2>
   <p class="nota-grande">${escapar(nota.total)}</p>
@@ -505,8 +552,17 @@ function gerarHtmlDashboard() {
   <h1>Validador de Novos Negócios</h1>
   <p class="subtitulo">Descreva a ideia e veja a nota de viabilidade.</p>
 
-  <label for="ideia">Sua ideia de negócio</label>
-  <textarea id="ideia" placeholder="Ex.: App para controlar gastos"></textarea>
+  <div class="entrada-ideia">
+    <div>
+      <label for="ideia">Sua ideia de negócio</label>
+      <textarea id="ideia" placeholder="Ex.: App para controlar gastos"></textarea>
+    </div>
+    <div class="campo-imagem">
+      <label for="imagem">Ou envie uma imagem</label>
+      <input id="imagem" type="file" accept="image/*">
+      <img id="preview-imagem" class="preview-imagem" alt="Pré-visualização da imagem selecionada" hidden>
+    </div>
+  </div>
   <button id="enviar" type="button">Validar ideia</button>
 
   <p class="banner-suave">As evidências são fornecidas por usuários. A qualidade da nota
@@ -543,6 +599,8 @@ function gerarHtmlDashboard() {
 <script>
 (function () {
   var campoIdeia = document.getElementById('ideia');
+  var campoImagem = document.getElementById('imagem');
+  var previewImagem = document.getElementById('preview-imagem');
   var botaoEnviar = document.getElementById('enviar');
   var botaoCopiar = document.getElementById('copiar');
   var aviso = document.getElementById('aviso');
@@ -578,11 +636,47 @@ function gerarHtmlDashboard() {
     return window.location.origin;
   }
 
+  function lerImagemComoDataUri(arquivo) {
+    return new Promise(function (resolve, reject) {
+      var leitor = new FileReader();
+      leitor.onload = function () { resolve(leitor.result); };
+      leitor.onerror = function () { reject(new Error('Nao foi possivel ler a imagem.')); };
+      leitor.readAsDataURL(arquivo);
+    });
+  }
+
+  campoImagem.addEventListener('change', function () {
+    var arquivo = campoImagem.files && campoImagem.files[0];
+
+    if (!arquivo) {
+      previewImagem.removeAttribute('src');
+      previewImagem.hidden = true;
+      return;
+    }
+
+    if (arquivo.size > 10 * 1024 * 1024) {
+      campoImagem.value = '';
+      previewImagem.removeAttribute('src');
+      previewImagem.hidden = true;
+      mostrarAviso('A imagem deve ter no máximo 10 MB.');
+      return;
+    }
+
+    lerImagemComoDataUri(arquivo).then(function (dataUri) {
+      previewImagem.src = dataUri;
+      previewImagem.hidden = false;
+      mostrarAviso('');
+    }).catch(function () {
+      mostrarAviso('Nao foi possivel ler a imagem selecionada.');
+    });
+  });
+
   async function enviar() {
     var ideia = campoIdeia.value.trim();
+    var arquivoImagem = campoImagem.files && campoImagem.files[0];
 
-    if (ideia === '') {
-      mostrarAviso('Escreva a ideia antes de validar.');
+    if (ideia === '' && !arquivoImagem) {
+      mostrarAviso('Escreva a ideia ou selecione uma imagem antes de validar.');
       return;
     }
 
@@ -590,10 +684,20 @@ function gerarHtmlDashboard() {
     mostrarAviso('');
 
     try {
+      var dados = {};
+
+      if (ideia !== '') {
+        dados.ideia = ideia;
+      }
+
+      if (arquivoImagem) {
+        dados.imagem_base64 = await lerImagemComoDataUri(arquivoImagem);
+      }
+
       var respostaValidacao = await fetch('/validar-ideia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ideia: ideia })
+        body: JSON.stringify(dados)
       });
       var validacao = await respostaValidacao.json();
 

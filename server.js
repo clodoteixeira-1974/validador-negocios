@@ -18,6 +18,10 @@ const { lerJsonl, escreverJsonl, avisarLinhasIgnoradas } = require('./jsonl');
 
 const PORTA_PADRAO = 3000;
 const LIMITE_CORPO = '100kb';
+const LIMITE_CORPO_VALIDAR = '14mb';
+const LIMITE_IMAGEM_BYTES = 10 * 1024 * 1024;
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'nvidia/nemotron-nano-12b-v2-vl:free';
 const SERVICO = 'validador-negocios';
 
 // Arquivo de persistência (JSON Lines), na mesma pasta do server.js
@@ -65,6 +69,90 @@ function validarIdeia(corpo) {
   }
 
   return { ok: true, ideia };
+}
+
+// Valida o data URI e mede os bytes da imagem decodificada, não o tamanho do
+// texto Base64 que atravessa o JSON.
+function validarImagemBase64(imagem) {
+  if (typeof imagem !== 'string') {
+    return { ok: false, erro: 'deve ser uma string' };
+  }
+
+  if (!imagem.startsWith('data:image/')) {
+    return { ok: false, erro: 'deve comecar com data:image/' };
+  }
+
+  const correspondencia = /^data:image\/[a-z0-9.+-]+;base64,([a-z0-9+/]*={0,2})$/i.exec(imagem);
+
+  if (!correspondencia || correspondencia[1] === '') {
+    return { ok: false, erro: 'data URI deve conter imagem em Base64 valida' };
+  }
+
+  const conteudoBase64 = correspondencia[1];
+  const bytes = Buffer.from(conteudoBase64, 'base64');
+  const base64Canonico = bytes.toString('base64').replace(/=+$/, '');
+
+  if (base64Canonico !== conteudoBase64.replace(/=+$/, '')) {
+    return { ok: false, erro: 'data URI deve conter imagem em Base64 valida' };
+  }
+
+  if (bytes.length > LIMITE_IMAGEM_BYTES) {
+    return { ok: false, erro: 'o tamanho maximo da imagem e 10 MB' };
+  }
+
+  return { ok: true };
+}
+
+async function extrairDescricaoImagem(imagem, fetchOpenRouter, apiKey, model) {
+  if (!apiKey) {
+    throw new Error('OPENROUTER_API_KEY nao configurada');
+  }
+
+  const resposta = await fetchOpenRouter('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: 'Extraia a descricao da ideia de negocio contida nesta imagem. Responda apenas com a descricao em texto, sem introducoes.'
+          },
+          {
+            type: 'image_url',
+            image_url: { url: imagem }
+          }
+        ]
+      }]
+    })
+  });
+
+  let corpo;
+
+  try {
+    corpo = await resposta.json();
+  } catch {
+    throw new Error(`resposta invalida do OpenRouter (HTTP ${resposta.status})`);
+  }
+
+  if (!resposta.ok) {
+    const motivo = corpo && corpo.error && corpo.error.message;
+    throw new Error(motivo || `OpenRouter respondeu HTTP ${resposta.status}`);
+  }
+
+  const descricao = corpo && corpo.choices && corpo.choices[0]
+    && corpo.choices[0].message && corpo.choices[0].message.content;
+
+  if (typeof descricao !== 'string' || descricao.trim() === '') {
+    throw new Error('resposta do OpenRouter nao contem uma descricao em texto');
+  }
+
+  return descricao.trim();
 }
 
 // Gera o id de uma validação.
@@ -146,6 +234,9 @@ function paginaExpirada(data) {
 function createApp(opcoes = {}) {
   const arquivoValidacoes = opcoes.arquivoValidacoes || ARQUIVO_VALIDACOES;
   const arquivoEvidencias = opcoes.arquivoEvidencias || ARQUIVO_EVIDENCIAS;
+  const fetchOpenRouter = opcoes.fetchOpenRouter || globalThis.fetch;
+  const openRouterApiKey = opcoes.openRouterApiKey ?? OPENROUTER_API_KEY;
+  const openRouterModel = opcoes.openRouterModel || OPENROUTER_MODEL;
 
   const app = express();
 
@@ -158,7 +249,9 @@ function createApp(opcoes = {}) {
   const limiteNota = criarLimitador({ maximo: 60 });
   const limiteDashboard = criarLimitador({ maximo: 60 });
 
-  // Middleware para parsear JSON, com limite de tamanho de corpo
+  // A validação aceita imagens de até 10 MB, cujo Base64 ocupa cerca de 14 MB.
+  // As demais rotas mantêm o limite original de 100 KB.
+  app.use('/validar-ideia', express.json({ limit: LIMITE_CORPO_VALIDAR }));
   app.use(express.json({ limit: LIMITE_CORPO }));
 
   // Healthcheck
@@ -194,19 +287,46 @@ function linkExpirado(validacao, agora = Date.now()) {
 }
 
 // Endpoint POST /validar-ideia
-  app.post('/validar-ideia', limiteValidarIdeia, (req, res) => {
-    const resultado = validarIdeia(req.body);
+  app.post('/validar-ideia', limiteValidarIdeia, async (req, res) => {
+    const corpo = req.body;
+    const temImagem = corpo && typeof corpo === 'object'
+      && Object.prototype.hasOwnProperty.call(corpo, 'imagem_base64');
+    let ideia;
 
-    if (!resultado.ok) {
-      return res.status(resultado.status).json({ error: resultado.erro });
+    if (temImagem) {
+      const validacaoImagem = validarImagemBase64(corpo.imagem_base64);
+
+      if (!validacaoImagem.ok) {
+        return res.status(400).json({ error: `Imagem invalida: ${validacaoImagem.erro}` });
+      }
+
+      try {
+        ideia = await extrairDescricaoImagem(
+          corpo.imagem_base64,
+          fetchOpenRouter,
+          openRouterApiKey,
+          openRouterModel
+        );
+      } catch (erro) {
+        return res.status(400).json({ error: `Falha ao processar imagem: ${erro.message}` });
+      }
+    } else {
+      const resultado = validarIdeia(corpo);
+
+      if (!resultado.ok) {
+        return res.status(resultado.status).json({ error: resultado.erro });
+      }
+
+      ideia = resultado.ideia;
     }
 
     const registro = {
       id: gerarId(),
-      ideia: resultado.ideia,
-      tipo: classificarTipo(resultado.ideia),
+      ideia,
+      tipo: classificarTipo(ideia),
       timestamp: new Date().toISOString(),
-      expires_at: gerarExpiracao()
+      expires_at: gerarExpiracao(),
+      ...(temImagem ? { imagem_base64: corpo.imagem_base64 } : {})
     };
 
     registrarValidacao(registro, arquivoValidacoes);
@@ -353,7 +473,8 @@ function linkExpirado(validacao, agora = Date.now()) {
   // eslint-disable-next-line no-unused-vars
   app.use((erro, req, res, next) => {
     if (erro.type === 'entity.too.large') {
-      return res.status(413).json({ error: 'Corpo da requisicao excede o limite de ' + LIMITE_CORPO });
+      const limite = req.path === '/validar-ideia' ? LIMITE_CORPO_VALIDAR : LIMITE_CORPO;
+      return res.status(413).json({ error: 'Corpo da requisicao excede o limite de ' + limite });
     }
 
     if (erro.type === 'entity.parse.failed') {
