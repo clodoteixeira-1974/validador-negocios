@@ -37,6 +37,12 @@ imagem ao OpenRouter apenas para extrair a descrição textual da ideia; essa de
 a ser o valor de `ideia` usado na classificação e nas demais etapas. Sem imagem, a validação
 continua usando o campo `ideia` enviado pelo cliente.
 
+O modelo visual é configurado pela variável de ambiente `OPENROUTER_MODEL`. O padrão é
+`openai/gpt-5.6-luna`; outro modelo pode ser informado nessa variável. O modelo é usado apenas
+para extrair a descrição da imagem, não para classificar a ideia nem calcular a nota. O servidor
+lê `OPENROUTER_API_KEY` e `OPENROUTER_MODEL` do ambiente e não carrega um arquivo `.env`
+automaticamente.
+
 Formato do `id`: **UUID versão 4**, por exemplo
 `550e8400-e29b-41d4-a716-446655440000`. São 36 caracteres, em formato hexadecimal
 separado por hífen, com o terceiro bloco começando em `4` e o quarto em `8`, `9`, `a` ou `b`.

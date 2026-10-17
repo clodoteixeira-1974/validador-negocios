@@ -8,6 +8,7 @@ const {
   createApp,
   classificarTipo,
   gerarId,
+  OPENROUTER_MODEL_PADRAO,
   ARQUIVO_VALIDACOES,
   ARQUIVO_EVIDENCIAS
 } = require('./server');
@@ -16,6 +17,10 @@ const {
 // O terceiro bloco começa com 4 e o quarto com 8, 9, a ou b, que é o que
 // distingue a versão 4 dentro do padrão de UUID.
 const REGEX_UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+test('modelo de visao padrao do OpenRouter e GPT-5.6 Luna', () => {
+  assert.equal(OPENROUTER_MODEL_PADRAO, 'openai/gpt-5.6-luna');
+});
 
 // Cada teste sobe o servidor em uma porta efêmera (listen(0)) e grava em arquivos
 // temporários. Os .jsonl de produção nunca são tocados.

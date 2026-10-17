@@ -226,13 +226,13 @@ ideia ou calcular a nota.
 Configure `OPENROUTER_API_KEY` no ambiente antes de iniciar o servidor. O arquivo
 `.env.example` documenta as variáveis, mas o projeto não carrega `.env` automaticamente.
 `OPENROUTER_MODEL` é opcional e, se ausente, usa
-`nvidia/nemotron-nano-12b-v2-vl:free`.
+`openai/gpt-5.6-luna`, o modelo de visão padrão.
 
 PowerShell:
 
 ```powershell
 $env:OPENROUTER_API_KEY="sua_chave"
-$env:OPENROUTER_MODEL="nvidia/nemotron-nano-12b-v2-vl:free"
+$env:OPENROUTER_MODEL="openai/gpt-5.6-luna"
 npm start
 ```
 

@@ -21,7 +21,8 @@ const LIMITE_CORPO = '100kb';
 const LIMITE_CORPO_VALIDAR = '14mb';
 const LIMITE_IMAGEM_BYTES = 10 * 1024 * 1024;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'nvidia/nemotron-nano-12b-v2-vl:free';
+const OPENROUTER_MODEL_PADRAO = 'openai/gpt-5.6-luna';
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || OPENROUTER_MODEL_PADRAO;
 const SERVICO = 'validador-negocios';
 
 // Arquivo de persistência (JSON Lines), na mesma pasta do server.js
@@ -515,6 +516,7 @@ module.exports = {
   PORTA_PADRAO,
   LIMITE_CORPO,
   SERVICO,
+  OPENROUTER_MODEL_PADRAO,
   PADRAO_MOBILE,
   CAMPOS_EVIDENCIA
 };
