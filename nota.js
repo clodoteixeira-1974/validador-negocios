@@ -21,6 +21,14 @@ const PONTOS_TEM_GENTE = 1;
 const MINIMO_RECLAMACOES = 1;
 const PONTOS_TEM_GENTE_INSATISFEITA = 1;
 
+// Critério 3 da régua: "cabe mais um?".
+// Diferente dos outros dois, este tem mínimo E máximo: o mercado precisa ter
+// concorrentes suficientes para provar que existe demanda, mas não tanto a
+// ponto de estar saturado. A faixa que vale ponto é de 2 a 4 concorrentes.
+const MINIMO_CONCORRENTES_CABE_MAIS_UM = 2;
+const MAXIMO_CONCORRENTES_CABE_MAIS_UM = 4;
+const PONTOS_CABE_MAIS_UM = 1;
+
 // Monta o texto do campo "detalhe" do critério "tem_gente".
 function detalharTemGente(total) {
   if (total === 0) {
@@ -45,6 +53,23 @@ function detalharReclamacoes(total) {
   }
 
   return `${total} reclamacoes registradas`;
+}
+
+// Monta o texto do campo "detalhe" do critério "cabe_mais_um".
+function detalharCabeMaisUm(total) {
+  if (total === 0) {
+    return 'Nenhum concorrente registrado. Mercado vazio.';
+  }
+
+  if (total === 1) {
+    return '1 concorrente registrado. Mercado pequeno.';
+  }
+
+  const situacao = total <= MAXIMO_CONCORRENTES_CABE_MAIS_UM
+    ? 'Ha espaco para mais um.'
+    : 'Mercado saturado.';
+
+  return `${total} concorrentes registrados. ${situacao}`;
 }
 
 // Conta as evidências de um tipo, ignorando entradas nulas ou sem tipo.
@@ -86,11 +111,29 @@ function avaliarTemGenteInsatisfeita(evidencias) {
   );
 }
 
+// Avalia o critério "cabe mais um?".
+// Não usa avaliarContagem: este critério tem mínimo E máximo, e a função
+// genérica só sabe lidar com um mínimo. O formato devolvido é o mesmo dos
+// outros, com pontos, maximo e detalhe.
+function avaliarCabeMaisUm(evidencias) {
+  const encontrados = contarDoTipo(evidencias, 'concorrente');
+
+  const dentroDaFaixa = encontrados >= MINIMO_CONCORRENTES_CABE_MAIS_UM
+    && encontrados <= MAXIMO_CONCORRENTES_CABE_MAIS_UM;
+
+  return {
+    pontos: dentroDaFaixa ? PONTOS_CABE_MAIS_UM : 0,
+    maximo: PONTOS_CABE_MAIS_UM,
+    detalhe: detalharCabeMaisUm(encontrados)
+  };
+}
+
 // Lista os critérios implementados, na ordem da régua. Para acrescentar um
 // critério novo, basta declarar a função avaliadora e incluí-la aqui.
 const CRITERIOS = [
   { nome: 'tem_gente', avaliar: avaliarTemGente },
-  { nome: 'tem_gente_insatisfeita', avaliar: avaliarTemGenteInsatisfeita }
+  { nome: 'tem_gente_insatisfeita', avaliar: avaliarTemGenteInsatisfeita },
+  { nome: 'cabe_mais_um', avaliar: avaliarCabeMaisUm }
 ];
 
 // Calcula a nota completa.
@@ -121,5 +164,8 @@ module.exports = {
   MINIMO_CONCORRENTES,
   PONTOS_TEM_GENTE,
   MINIMO_RECLAMACOES,
-  PONTOS_TEM_GENTE_INSATISFEITA
+  PONTOS_TEM_GENTE_INSATISFEITA,
+  MINIMO_CONCORRENTES_CABE_MAIS_UM,
+  MAXIMO_CONCORRENTES_CABE_MAIS_UM,
+  PONTOS_CABE_MAIS_UM
 };

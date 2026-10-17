@@ -29,14 +29,15 @@ O Validador de Novos Negócios é um serviço HTTP que recebe a descrição de u
 negócio, classifica o tipo dela e registra a validação com data e hora. Ele também recebe
 e lista evidências de mercado (concorrentes, reclamações de usuários e dados de setor) e
 calcula uma nota de viabilidade a partir delas. Hoje ele valida, classifica, guarda as
-evidências e aplica dois critérios da régua; a coleta de dados de verdade e o
+evidências e aplica três critérios da régua; a coleta de dados de verdade e o
 relatório final ainda não existem.
 
 ## O que existe hoje
 
 - Endpoint `POST /validar-ideia`
 - Endpoints `POST /evidencias` e `GET /evidencias` (integrados ao `server.js`)
-- Endpoint `GET /nota` (dois critérios da régua: "tem gente?" e "tem gente insatisfeita?")
+- Endpoint `GET /nota` (três critérios da régua: "tem gente?", "tem gente insatisfeita?" e
+  "cabe mais um?")
 - Módulo `nota.js` com a função `calcularNota(evidencias)`, sem I/O e sem dependências.
   Cada critério devolve `pontos`, `maximo` e `detalhe`; `total` e `maximo_possivel` são
   somas
@@ -47,14 +48,14 @@ relatório final ainda não existem.
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 43 testes automatizados (26 em `server.test.js` + 7 em `evidencias.test.js` + 10 em
+- 47 testes automatizados (27 em `server.test.js` + 7 em `evidencias.test.js` + 13 em
   `nota.test.js`)
 
 ## O que não existe ainda
 
 Alinhado ao fluxograma do projeto:
 
-- Demais critérios da régua (3 dos 5 ainda não implementados)
+- Demais critérios da régua (2 dos 5 ainda não implementados)
 - Coleta real de concorrentes
 - Extração de reclamações
 - Integração com LLM
@@ -93,7 +94,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 
 - Servidor: não está rodando. Para iniciar: `npm start`
 - Porta padrão: 3000 (configurável via `PORT`)
-- Testes: `npm test` (43 passando)
+- Testes: `npm test` (47 passando)
 - Repositório GitHub: https://github.com/clodoteixeira-1974/validador-negocios
 - Branch principal: `main`
 
@@ -102,7 +103,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 43 testes automatizados
+npm test        # roda os 47 testes automatizados
 ```
 
 Exemplos de chamada:
@@ -128,8 +129,24 @@ Para usar outra porta: `PORT=8080 npm start` (Linux/macOS) ou
 
 ## Próximo passo
 
-**Tarefa 16 — terceiro critério da régua**. A régua do fluxograma tem cinco critérios; os
-dois primeiros ("tem gente?" e "tem gente insatisfeita?") já existem. O terceiro deve ser
-implementado seguindo o mesmo padrão: acrescentar a função avaliadora em `nota.js` e
-declará-la na lista `CRITERIOS`. Com a refatoração feita nesta tarefa, `total` e
-`maximo_possivel` passam a 3 sozinhos, sem nenhuma outra alteração no cálculo.
+**Tarefa 17 — quarto critério da régua: "alguém paga?"**. Os três primeiros já existem.
+Este é o primeiro critério que não é uma simples contagem de evidências, e vale decidir
+com cuidado o que ele vai olhar e com que dado ele vai contar. Com a estrutura atual do
+`nota.js`, o que não muda é a forma: escrever o detalhe, o avaliador devolvendo
+`{ pontos, maximo, detalhe }`, e declarar uma linha em `CRITERIOS`. `total` e
+`maximo_possivel` passam a 4 sozinhos.
+
+## Pendências conhecidas
+
+Nada foi adiado nesta tarefa. As pendências que existiam sobre o 405 de `/nota` e de
+`/evidencias` foram resolvidas no fix-01.
+
+Permanecem em aberto, todas de ambiente ou de infraestrutura, nenhuma de código:
+
+- **Comando `memory` inexistente**: o `AGENTS.md` pede
+  `memory --action read --target daily`, que não existe neste ambiente. Alternativa
+  disponível: ler o `ESTADO.md`, que é o que este arquivo é.
+- **Sem backup dos `.jsonl`**: os dados de execução são ignorados pelo Git e existem só na
+  máquina local. Falta o script para rodar via `cron` na VPS.
+- **Sem `.env`**: quando a integração com LLM acontecer, faltará o arquivo de variáveis de
+  ambiente e o `.env.example`. O `.gitignore` já está preparado para versionar o exemplo.

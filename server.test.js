@@ -365,10 +365,15 @@ test('GET /nota com arquivo de evidencias vazio: 200 com total 0', async () => {
           pontos: 0,
           maximo: 1,
           detalhe: 'Nenhuma reclamacao registrada.'
+        },
+        cabe_mais_um: {
+          pontos: 0,
+          maximo: 1,
+          detalhe: 'Nenhum concorrente registrado. Mercado vazio.'
         }
       },
       total: 0,
-      maximo_possivel: 2
+      maximo_possivel: 3
     });
   });
 });
@@ -384,8 +389,13 @@ test('GET /nota apos 2 concorrentes: 200 com tem_gente.pontos igual a 1', async 
     assert.equal(r.corpo.criterios.tem_gente.pontos, 1);
     assert.equal(r.corpo.criterios.tem_gente.maximo, 1);
     assert.equal(r.corpo.criterios.tem_gente.detalhe, '2 concorrentes registrados');
-    assert.equal(r.corpo.total, 1);
-    assert.equal(r.corpo.maximo_possivel, 2);
+
+    // 2 concorrentes também estão dentro da faixa de "cabe mais um?".
+    assert.equal(r.corpo.criterios.cabe_mais_um.pontos, 1);
+    assert.equal(r.corpo.criterios.cabe_mais_um.detalhe, '2 concorrentes registrados. Ha espaco para mais um.');
+
+    assert.equal(r.corpo.total, 2);
+    assert.equal(r.corpo.maximo_possivel, 3);
   });
 });
 
@@ -406,8 +416,12 @@ test('GET /nota com 1 concorrente e 1 reclamacao: tem_gente vale 0 e a insatisfe
     assert.equal(r.corpo.criterios.tem_gente_insatisfeita.pontos, 1);
     assert.equal(r.corpo.criterios.tem_gente_insatisfeita.detalhe, '1 reclamacao registrada');
 
+    // 1 concorrente está abaixo da faixa de "cabe mais um?".
+    assert.equal(r.corpo.criterios.cabe_mais_um.pontos, 0);
+    assert.equal(r.corpo.criterios.cabe_mais_um.detalhe, '1 concorrente registrado. Mercado pequeno.');
+
     assert.equal(r.corpo.total, 1);
-    assert.equal(r.corpo.maximo_possivel, 2);
+    assert.equal(r.corpo.maximo_possivel, 3);
 
     // As duas evidências continuam registradas: a nota não consome nem apaga nada.
     const evidencias = await getEvidencias(base);
@@ -415,7 +429,7 @@ test('GET /nota com 1 concorrente e 1 reclamacao: tem_gente vale 0 e a insatisfe
   });
 });
 
-test('GET /nota com 2 concorrentes e 1 reclamacao: total 2 e maximo_possivel 2', async () => {
+test('GET /nota com 2 concorrentes e 1 reclamacao: total 3 e maximo_possivel 3', async () => {
   await comServidor(async ({ base }) => {
     await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A' }));
     await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B' }));
@@ -426,8 +440,38 @@ test('GET /nota com 2 concorrentes e 1 reclamacao: total 2 e maximo_possivel 2',
     assert.equal(r.status, 200);
     assert.equal(r.corpo.criterios.tem_gente.pontos, 1);
     assert.equal(r.corpo.criterios.tem_gente_insatisfeita.pontos, 1);
-    assert.equal(r.corpo.total, 2);
-    assert.equal(r.corpo.maximo_possivel, 2);
+    assert.equal(r.corpo.criterios.cabe_mais_um.pontos, 1);
+    assert.equal(r.corpo.total, 3);
+    assert.equal(r.corpo.maximo_possivel, 3);
+  });
+});
+
+test('GET /nota com 5 concorrentes: tem_gente vale 1 e cabe_mais_um vale 0', async () => {
+  await comServidor(async ({ base }) => {
+    for (const fonte of ['A', 'B', 'C', 'D', 'E']) {
+      await postEvidencia(base, evidenciaValida({ fonte: `Concorrente ${fonte}` }));
+    }
+
+    const r = await getNota(base);
+
+    assert.equal(r.status, 200);
+
+    // 5 concorrentes ainda provam que o mercado existe.
+    assert.equal(r.corpo.criterios.tem_gente.pontos, 1);
+
+    // Mas passam do máximo de 4, então o mercado é considerado saturado.
+    assert.equal(r.corpo.criterios.cabe_mais_um.pontos, 0);
+    assert.equal(r.corpo.criterios.cabe_mais_um.detalhe, '5 concorrentes registrados. Mercado saturado.');
+
+    // Sem reclamações, o segundo critério não pontua.
+    assert.equal(r.corpo.criterios.tem_gente_insatisfeita.pontos, 0);
+
+    assert.equal(r.corpo.total, 1);
+    assert.equal(r.corpo.maximo_possivel, 3);
+
+    // As cinco evidências continuam registradas.
+    const evidencias = await getEvidencias(base);
+    assert.equal(evidencias.corpo.total, 5);
   });
 });
 
