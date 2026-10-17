@@ -169,6 +169,65 @@ test('listar evidências após registrar 3: devolve 3 na ordem de gravação', a
   });
 });
 
+test('linha corrompida é ignorada e não derruba a listagem', async () => {
+  await comArquivo(async (arquivo) => {
+    registrarEvidencia(definicaoValida({ fonte: 'Valida 1' }), arquivo);
+    registrarEvidencia(definicaoValida({ fonte: 'Valida 2' }), arquivo);
+    registrarEvidencia(definicaoValida({ fonte: 'Valida 3' }), arquivo);
+
+    // Corrompe a segunda das três, no meio do arquivo.
+    const linhas = fs.readFileSync(arquivo, 'utf8').split('\n');
+    linhas[1] = '{isto nao e json valido';
+    fs.writeFileSync(arquivo, linhas.join('\n'), 'utf8');
+
+    // Não lança, e devolve as duas linhas boas.
+    const listadas = listarEvidencias(arquivo);
+
+    assert.equal(listadas.length, 2);
+    assert.deepEqual(listadas.map((evidencia) => evidencia.fonte), ['Valida 1', 'Valida 3']);
+  });
+});
+
+test('corrupção no meio não impede o filtro por id_validacao', async () => {
+  await comArquivo(async (arquivo) => {
+    registrarEvidencia(definicaoValida({ fonte: 'A1', id_validacao: 'val-1' }), arquivo);
+    registrarEvidencia(definicaoValida({ fonte: 'Corrompida' }), arquivo);
+    registrarEvidencia(definicaoValida({ fonte: 'A2', id_validacao: 'val-1' }), arquivo);
+
+    const linhas = fs.readFileSync(arquivo, 'utf8').split('\n');
+    linhas[1] = '{"tipo": "concorrente"';
+    fs.writeFileSync(arquivo, linhas.join('\n'), 'utf8');
+
+    const daVal1 = listarEvidencias(arquivo, 'val-1');
+
+    assert.equal(daVal1.length, 2);
+    assert.deepEqual(daVal1.map((evidencia) => evidencia.fonte), ['A1', 'A2']);
+  });
+});
+
+test('arquivo com todas as linhas corrompidas devolve lista vazia, sem lançar', async () => {
+  await comArquivo(async (arquivo) => {
+    fs.writeFileSync(arquivo, '{lixo\nnao e json\n\n', 'utf8');
+
+    assert.deepEqual(listarEvidencias(arquivo), []);
+  });
+});
+
+test('linha corrompida não impede gravar registros novos', async () => {
+  await comArquivo(async (arquivo) => {
+    fs.writeFileSync(arquivo, '{"tipo":"concorrente"\n', 'utf8');
+
+    const gravada = registrarEvidencia(definicaoValida({ fonte: 'Gravada depois' }), arquivo);
+
+    assert.ok(gravada.id);
+
+    // A linha boa anterior era inválida e foi descartada; a nova está no arquivo.
+    const linhas = lerLinhas(arquivo);
+    assert.equal(linhas.length, 2);
+    assert.equal(JSON.parse(linhas[1]).fonte, 'Gravada depois');
+  });
+});
+
 test('nenhum teste grava no evidencias.jsonl de produção', async () => {
   const antes = contagemLinhas(ARQUIVO_EVIDENCIAS);
 

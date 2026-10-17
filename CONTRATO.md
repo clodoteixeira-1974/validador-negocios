@@ -113,6 +113,47 @@ HTML em memória, gerado por `gerarHtmlRelatorio`. Não é gravado em disco.
 Todo dado vindo da Validação, da Evidência ou da Nota passa por `escapar()` antes de entrar
 no HTML.
 
+## Comportamento de leitura de `.jsonl`
+
+Os dois arquivos, `validacoes.jsonl` e `evidencias.jsonl`, são lidos pela **mesma função**,
+`lerJsonl` do módulo `jsonl.js`. Antes desta unificação, cada arquivo tinha um
+comportamento próprio diante de corrupção, e o comportamento perigoso era o do arquivo de
+evidências: uma única linha inválida derrubava `GET /evidencias`, `GET /nota` e
+`GET /relatorio/:id` com 500. A auditoria Red Team do fix-04 encontrou isso.
+
+Comportamento único, aplicado aos dois:
+
+| Situação da linha | O que acontece |
+| --- | --- |
+| vazia | ignorada, sem aviso |
+| JSON válido | entra no resultado, na ordem do arquivo |
+| JSON inválido | **ignorada, com aviso, e a leitura continua** |
+
+A leitura **nunca lança** por conteúdo corrompido, e nenhuma rota devolve 500 por causa de
+uma linha ruim. Arquivo inexistente é tratado como arquivo vazio. Arquivo inteiro corrompido
+devolve lista vazia, não erro.
+
+O aviso sai por `console.warn` no formato:
+
+```
+[jsonl] 1 linha(s) ignorada(s) em <arquivo> por JSON invalido: 2
+```
+
+**O aviso registra o número da linha, nunca o conteúdo.** Uma linha corrompida costuma
+conter lixo ou um registro pela metade, e não é lugar para vazar em log. Quando há mais de
+20 linhas ruins, só as primeiras 20 são listadas.
+
+A gravação é sempre por acréscimo (`escreverJsonl`), e **não existe caminho no código para
+remover ou corriger um registro**. Uma linha corrompida é ignorada na leitura, mas continua
+gravada no arquivo.
+
+### O que isso não resolve
+
+Linha corrompida não é o mesmo que registro perdido. A resiliência aqui é de **leitura**: o
+sistema continua utilizável com o histórico pela metade, e o aviso diz quantas linhas
+sumiram. **Não existe** detecção de perda, reparo nem cópia de segurança — e os arquivos
+`.jsonl` seguem ignorados pelo Git, ou seja, sem backup.
+
 ## Pendências do contrato
 
 - **`relevancia` é coletada e não usada.** É o único campo do contrato que não alimenta

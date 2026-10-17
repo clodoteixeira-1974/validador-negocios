@@ -910,6 +910,79 @@ test('GET /relatorio/:id mostra a nota daquela validacao, e nao a global', async
   });
 });
 
+test('arquivo de validacoes corrompido não impede o relatório das validações boas', async () => {
+  await comServidor(async ({ base, arquivo, arquivoEvidencias }) => {
+    const primeira = await post(base, { ideia: 'App para controlar gastos' });
+    const segunda = await post(base, { ideia: 'Consultoria de marketing' });
+
+    // Corrompe a segunda das duas linhas do arquivo de validacoes.
+    const linhas = fs.readFileSync(arquivo, 'utf8').split('\n');
+    linhas[1] = '{isto nao e json valido';
+    fs.writeFileSync(arquivo, linhas.join('\n'), 'utf8');
+
+    // A validação boa continua acessível e o relatório abre.
+    const relatorio = await fetch(`${base}/relatorio/${primeira.corpo.id}`);
+    const corpo = await relatorio.text();
+
+    assert.equal(relatorio.status, 200);
+    assert.ok(corpo.includes('App para controlar gastos'));
+
+    // A validação corrompida simplesmente não existe mais.
+    const relatorioPerdido = await fetch(`${base}/relatorio/${segunda.corpo.id}`);
+    assert.equal(relatorioPerdido.status, 404);
+  });
+});
+
+test('arquivo de evidencias corrompido não derruba /nota nem /evidencias', async () => {
+  await comServidor(async ({ base, arquivoEvidencias }) => {
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A', id_validacao: 'v1' }));
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente B', id_validacao: 'v1' }));
+
+    // Corrompe uma linha no meio das duas.
+    const linhas = fs.readFileSync(arquivoEvidencias, 'utf8').split('\n');
+    linhas[0] = '{quebrada';
+    fs.writeFileSync(arquivoEvidencias, linhas.join('\n'), 'utf8');
+
+    const evidencias = await getEvidencias(base);
+    assert.equal(evidencias.status, 200);
+    assert.equal(evidencias.corpo.total, 1);
+    assert.equal(evidencias.corpo.evidencias[0].fonte, 'Concorrente B');
+
+    // A nota é calculada com o que sobrou, sem erro 500.
+    const nota = await getNota(base);
+    assert.equal(nota.status, 200);
+    assert.equal(nota.corpo.total, 0);
+    assert.equal(nota.corpo.criterios.tem_gente.detalhe, '1 concorrente registrado. Minimo: 2.');
+
+    // E o filtro por id também funciona com o arquivo pela metade.
+    const filtrada = await fetch(`${base}/evidencias?id=v1`);
+    const corpoFiltrado = await filtrada.json();
+    assert.equal(filtrada.status, 200);
+    assert.equal(corpoFiltrado.total, 1);
+  });
+});
+
+test('relatório e nota abrem mesmo com os dois arquivos corrompidos', async () => {
+  await comServidor(async ({ base, arquivo, arquivoEvidencias }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+
+    fs.writeFileSync(arquivo, '{lixo\n', 'utf8');
+    fs.writeFileSync(arquivoEvidencias, '{"tipo":"concorrente"\n', 'utf8');
+
+    const relatorio = await fetch(`${base}/relatorio/${validacao.corpo.id}`);
+    assert.equal(relatorio.status, 404);
+
+    const nota = await getNota(base);
+    assert.equal(nota.status, 200);
+    assert.equal(nota.corpo.total, 0);
+    assert.equal(nota.corpo.veredito.decisao, 'PARAR');
+
+    const evidencias = await getEvidencias(base);
+    assert.equal(evidencias.status, 200);
+    assert.equal(evidencias.corpo.total, 0);
+  });
+});
+
 test('nenhum teste de /nota grava no evidencias.jsonl de producao', async () => {
   const antes = lerLinhas(ARQUIVO_EVIDENCIAS).length;
 

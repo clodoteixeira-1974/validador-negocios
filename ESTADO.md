@@ -51,6 +51,9 @@ nota por ideia e link de compartilhamento. Falta o dado real.
 - [Alta] Vínculo automático entre ideia e evidência na hora de coletar
 - [Média] Publicação do serviço, hoje sem controle de acesso
 - [Média] Extração de reclamações
+- [Média] Detecção de perda e reparo de linha corrompida. A leitura já é resiliente e a
+  linha ruim é ignorada com aviso, mas ela **continua no arquivo** e não existe caminho para
+  removê-la. Junto com a ausência de backup, um arquivo pela metade continua sem reparo
 - [Baixa] Integração com LLM e RAG
 - [Baixa] Relatório que compare mais de uma validação
 - [Baixa] Backup dos dados de execução e `.env`
@@ -182,8 +185,12 @@ dados de verdade e o relatório final ainda não existem.
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 79 testes automatizados (41 em `server.test.js` + 15 em `evidencias.test.js` + 23 em
+- 86 testes automatizados (44 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
   `nota.test.js`)
+- **Leitura de `.jsonl` resiliente e unificada**: `validacoes.jsonl` e `evidencias.jsonl` são
+  lidos pela mesma função, em `jsonl.js`. Linha corrompida é ignorada com aviso em
+  `console.warn`, e as demais linhas continuam sendo servidas. Uma linha ruim não devolve
+  500 em nenhuma rota. O formato está em `CONTRATO.md`
 
 ## O que não existe ainda
 
@@ -227,7 +234,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 
 - Servidor: não está rodando. Para iniciar: `npm start`
 - Porta padrão: 3000 (configurável via `PORT`)
-- Testes: `npm test` (79 passando)
+- Testes: `npm test` (86 passando)
 - Repositório GitHub: https://github.com/clodoteixeira-1974/validador-negocios
 - Branch principal: `main`
 
@@ -236,7 +243,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 79 testes automatizados
+npm test        # roda os 86 testes automatizados
 ```
 
 Exemplos de chamada:

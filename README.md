@@ -106,7 +106,7 @@ Para rodar os testes:
 npm test
 ```
 
-São 79 testes automatizados, todos passando.
+São 86 testes automatizados, todos passando.
 
 Dois exemplos de chamada:
 
@@ -196,6 +196,11 @@ curl http://localhost:3000/nota
 
 O corpo da resposta é sempre JSON, inclusive nos casos de erro.
 
+Os dados ficam em dois arquivos de texto, um registro JSON por linha: `validacoes.jsonl` e
+`evidencias.jsonl`. A leitura é **resiliente**: se uma linha ficar corrompida, ela é
+ignorada com um aviso no log, e as demais linhas continuam sendo servidas normalmente. Uma
+linha ruim nunca derruba o serviço com erro 500.
+
 Um exemplo de resposta de `/nota`, com três concorrentes e duas reclamações registradas:
 
 ```json
@@ -248,11 +253,12 @@ decisão, e é descrito na seção seguinte.
 | Arquivo                             | Função                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `server.js`                         | O serviço. Recebe requisições, valida, classifica, grava e devolve as respostas.                         |
-| `server.test.js`                    | 41 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
+| `server.test.js`                    | 44 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
 | `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações, dados de mercado, monetização e alcance. |
-| `evidencias.test.js`                | 15 testes do módulo de evidências, também com arquivos temporários.                                      |
+| `evidencias.test.js`                | 19 testes do módulo de evidências, também com arquivos temporários.                                      |
 | `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua e deriva o veredito.                           |
 | `nota.test.js`                      | 23 testes do cálculo da nota e do veredito, sem HTTP e sem disco.                                          |
+| `jsonl.js`                          | Leitura e escrita dos arquivos JSON Lines, compartilhadas pelos dois módulos.                              |
 | `relatorio.js`                      | Gera o HTML do relatório A4 e do dashboard, com o CSS embutido.                                            |
 | `testar-evidencias.js`              | Script de verificação manual do módulo de evidências.                                                     |
 | `package.json`                      | Nome do projeto e os comandos `start` e `test`.                                                          |
@@ -274,7 +280,7 @@ Fase avançada: o serviço de validação e classificação está funcionando, a
 completa com os cinco critérios, cada nota vem com um veredito, e a nota é **por ideia**:
 as evidências se vinculam ao identificador da validação, e o relatório mostra a nota
 correta daquela ideia. Há um dashboard em HTML que gera um relatório A4 com link para
-compartilhar. São 79 testes automatizados, todos passando.
+compartilhar. São 86 testes automatizados, todos passando.
 
 O que ainda falta: coletar concorrentes e reclamações de verdade, e publicar o serviço.
 

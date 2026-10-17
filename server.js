@@ -1,5 +1,4 @@
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
 
 const {
@@ -11,6 +10,8 @@ const {
 const { calcularNota } = require('./nota');
 
 const { gerarHtmlRelatorio, gerarHtmlDashboard } = require('./relatorio');
+
+const { lerJsonl, escreverJsonl, avisarLinhasIgnoradas } = require('./jsonl');
 
 const PORTA_PADRAO = 3000;
 const LIMITE_CORPO = '100kb';
@@ -65,29 +66,19 @@ function gerarId() {
 // Grava uma validação bem-sucedida em JSON Lines (append).
 // O caminho é opcional: os testes automatizados passam um arquivo temporário.
 function registrarValidacao(registro, arquivo = ARQUIVO_VALIDACOES) {
-  const linha = JSON.stringify(registro);
-  fs.appendFileSync(arquivo, linha + '\n', 'utf8');
+  escreverJsonl(arquivo, registro);
 }
 
 // Procura uma validação pelo id. Devolve null quando não achar ou quando o
-// arquivo não existe. Linhas com JSON inválido são puladas em vez de quebrar a
-// leitura: um registro corrompido não deve derrubar o relatório das demais.
+// arquivo não existe. Linha corrompida é ignorada com aviso, igual ao que
+// acontece com as evidências: um registro ruim não derruba o relatório das
+// demais validações.
 function buscarValidacao(id, arquivo = ARQUIVO_VALIDACOES) {
-  if (!fs.existsSync(arquivo)) {
-    return null;
-  }
+  const { registros, linhasIgnoradas } = lerJsonl(arquivo);
 
-  const linhas = fs.readFileSync(arquivo, 'utf8').split('\n').filter((linha) => linha.trim() !== '');
+  avisarLinhasIgnoradas(arquivo, linhasIgnoradas);
 
-  for (const linha of linhas) {
-    let registro;
-
-    try {
-      registro = JSON.parse(linha);
-    } catch (erro) {
-      continue;
-    }
-
+  for (const registro of registros) {
     if (registro && registro.id === id) {
       return registro;
     }

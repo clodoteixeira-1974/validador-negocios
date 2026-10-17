@@ -1,5 +1,6 @@
-const fs = require('fs');
 const path = require('path');
+
+const { lerJsonl, escreverJsonl, avisarLinhasIgnoradas } = require('./jsonl');
 
 // Arquivo de evidências (JSON Lines), na mesma pasta do server.js
 const ARQUIVO_EVIDENCIAS = path.join(__dirname, 'evidencias.jsonl');
@@ -137,7 +138,7 @@ function registrarEvidencia(evidencia, arquivo = ARQUIVO_EVIDENCIAS) {
     ordem.id_validacao = registro.id_validacao;
   }
 
-  fs.appendFileSync(arquivo, JSON.stringify(ordem) + '\n', 'utf8');
+  escreverJsonl(arquivo, ordem);
 
   return ordem;
 }
@@ -145,22 +146,13 @@ function registrarEvidencia(evidencia, arquivo = ARQUIVO_EVIDENCIAS) {
 // Lê o arquivo e devolve um array de objetos. Arquivo inexistente = array vazio.
 // Com idValidacao informado, devolve só as evidências vinculadas a ele; sem o
 // parâmetro, devolve todas.
+// Linha corrompida é ignorada com aviso, e não interrompe a leitura: um registro
+// ruim não pode derrubar o histórico inteiro.
 // O caminho é opcional e segue a mesma regra de registrarEvidencia.
 function listarEvidencias(arquivo = ARQUIVO_EVIDENCIAS, idValidacao) {
-  if (!fs.existsSync(arquivo)) {
-    return [];
-  }
+  const { registros, linhasIgnoradas } = lerJsonl(arquivo);
 
-  const conteudo = fs.readFileSync(arquivo, 'utf8');
-  const linhas = conteudo.split('\n').filter((linha) => linha.trim() !== '');
-
-  const registros = linhas.map((linha, indice) => {
-    try {
-      return JSON.parse(linha);
-    } catch (erro) {
-      throw new Error(`Linha ${indice + 1} de ${path.basename(arquivo)} não é um JSON válido: ${erro.message}`);
-    }
-  });
+  avisarLinhasIgnoradas(arquivo, linhasIgnoradas);
 
   if (typeof idValidacao !== 'string' || idValidacao.trim() === '') {
     return registros;
