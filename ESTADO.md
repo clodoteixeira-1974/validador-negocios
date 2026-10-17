@@ -10,8 +10,11 @@ Estas regras valem para todas as tarefas, a partir da Tarefa 14.
 - **Toda tarefa de código inclui a atualização de `README.md` e `ESTADO.md` no mesmo
   commit.** Não vale abrir tarefa separada para isso: a documentação ficou para trás duas
   vezes seguidas (Tarefas 11 e 13) e custou trabalho de correção.
-- **Cada tarefa gera um relatório** em `relatorios/`, com o nome
-  `tarefa-NN-descricao.md`.
+- **Cada tarefa gera um relatório** em `relatorios/`, com a convenção de nomes abaixo.
+- **Convenção de nomes dos relatórios**: `tarefa-NN-descricao.md` para tarefa de código,
+  `doc-NN-descricao.md` para tarefa de documentação, `fix-NN-descricao.md` para tarefa de
+  correção. O prefixo diz o tipo da tarefa, para resolver as colisões de numeração que
+  aconteceram três vezes seguidas.
 - **Todo relatório termina com a confirmação de existência e tamanho**, com a saída real
   de `Test-Path` e de `(Get-Item ...).Length`.
 - **Testes manuais com `curl.exe` não são usados neste ambiente.** O PowerShell 5.1 quebra
@@ -26,15 +29,17 @@ O Validador de Novos Negócios é um serviço HTTP que recebe a descrição de u
 negócio, classifica o tipo dela e registra a validação com data e hora. Ele também recebe
 e lista evidências de mercado (concorrentes, reclamações de usuários e dados de setor) e
 calcula uma nota de viabilidade a partir delas. Hoje ele valida, classifica, guarda as
-evidências e aplica o primeiro critério da régua; a coleta de dados de verdade e o
+evidências e aplica dois critérios da régua; a coleta de dados de verdade e o
 relatório final ainda não existem.
 
 ## O que existe hoje
 
 - Endpoint `POST /validar-ideia`
 - Endpoints `POST /evidencias` e `GET /evidencias` (integrados ao `server.js`)
-- Endpoint `GET /nota` (primeiro critério da régua: "tem gente?")
-- Módulo `nota.js` com a função `calcularNota(evidencias)`, sem I/O e sem dependências
+- Endpoint `GET /nota` (dois critérios da régua: "tem gente?" e "tem gente insatisfeita?")
+- Módulo `nota.js` com a função `calcularNota(evidencias)`, sem I/O e sem dependências.
+  Cada critério devolve `pontos`, `maximo` e `detalhe`; `total` e `maximo_possivel` são
+  somas
 - Classificação mobile/outro (palavras-chave `app`, `aplicativo`)
 - Persistência em `validacoes.jsonl` e `evidencias.jsonl`
 - Módulo `evidencias.js`, com caminho de arquivo injetável para que os testes não toquem
@@ -42,14 +47,14 @@ relatório final ainda não existem.
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 36 testes automatizados (23 em `server.test.js` + 7 em `evidencias.test.js` + 6 em
+- 41 testes automatizados (24 em `server.test.js` + 7 em `evidencias.test.js` + 10 em
   `nota.test.js`)
 
 ## O que não existe ainda
 
 Alinhado ao fluxograma do projeto:
 
-- Demais critérios da régua (4 dos 5 ainda não implementados)
+- Demais critérios da régua (3 dos 5 ainda não implementados)
 - Coleta real de concorrentes
 - Extração de reclamações
 - Integração com LLM
@@ -88,7 +93,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 
 - Servidor: não está rodando. Para iniciar: `npm start`
 - Porta padrão: 3000 (configurável via `PORT`)
-- Testes: `npm test` (36 passando)
+- Testes: `npm test` (41 passando)
 - Repositório GitHub: https://github.com/clodoteixeira-1974/validador-negocios
 - Branch principal: `main`
 
@@ -97,7 +102,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 36 testes automatizados
+npm test        # roda os 41 testes automatizados
 ```
 
 Exemplos de chamada:
@@ -123,6 +128,8 @@ Para usar outra porta: `PORT=8080 npm start` (Linux/macOS) ou
 
 ## Próximo passo
 
-**Tarefa 14 — segundo critério da régua**: "tem gente insatisfeita?". Se houver pelo menos
-1 reclamação registrada como evidência, atribuir 1 ponto. O total da nota precisa passar a
-ser a soma de todos os critérios implementados.
+**Tarefa 16 — terceiro critério da régua**. A régua do fluxograma tem cinco critérios; os
+dois primeiros ("tem gente?" e "tem gente insatisfeita?") já existem. O terceiro deve ser
+implementado seguindo o mesmo padrão: acrescentar a função avaliadora em `nota.js` e
+declará-la na lista `CRITERIOS`. Com a refatoração feita nesta tarefa, `total` e
+`maximo_possivel` passam a 3 sozinhos, sem nenhuma outra alteração no cálculo.

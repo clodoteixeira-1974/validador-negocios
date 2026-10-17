@@ -28,10 +28,15 @@ As evidências são identificadas e datadas pelo próprio servidor: o cliente n�
 identificador nem a data, apenas o conteúdo da evidência. Um registro sem os campos
 obrigatórios é recusado com erro, e nada é gravado.
 
-A nota é um número de 0 a 5 pontos, dividido em cinco critérios. **O primeiro deles, "tem
-gente?", já está implementado**: ele conta os concorrentes registrados e concede o ponto
-quando há dois ou mais. Os outros quatro ainda não existem. Por enquanto a nota é geral,
-ou seja, considera todas as evidências guardadas, sem distinguir uma ideia da outra.
+A nota é um número de 0 a 5 pontos, dividido em cinco critérios. **Dois deles já estão
+implementados**:
+
+- **"Tem gente?"** — concede 1 ponto quando há 2 ou mais concorrentes registrados.
+- **"Tem gente insatisfeita?"** — concede 1 ponto quando há pelo menos uma reclamação
+  registrada.
+
+Os outros três ainda não existem. Por enquanto a nota é geral, ou seja, considera todas as
+evidências guardadas, sem distinguir uma ideia da outra.
 
 O projeto foi construído em etapas pequenas, cada uma com testes automatizados e um
 relatório em `relatorios/` explicando o que foi feito e por quê.
@@ -58,7 +63,7 @@ Para rodar os testes:
 npm test
 ```
 
-São 36 testes automatizados, todos passando.
+São 41 testes automatizados, todos passando.
 
 Dois exemplos de chamada:
 
@@ -110,35 +115,42 @@ curl http://localhost:3000/nota
 
 O corpo da resposta é sempre JSON, inclusive nos casos de erro.
 
-Um exemplo de resposta de `/nota`, com três concorrentes registrados:
+Um exemplo de resposta de `/nota`, com três concorrentes e duas reclamações registradas:
 
 ```json
 {
   "criterios": {
     "tem_gente": {
       "pontos": 1,
+      "maximo": 1,
       "detalhe": "3 concorrentes registrados"
+    },
+    "tem_gente_insatisfeita": {
+      "pontos": 1,
+      "maximo": 1,
+      "detalhe": "2 reclamacoes registradas"
     }
   },
-  "total": 1,
-  "maximo_possivel": 1
+  "total": 2,
+  "maximo_possivel": 2
 }
 ```
 
-O campo `detalhe` diz como o ponto foi calculado, para que a nota não seja um número
-solto. Hoje `maximo_possivel` vale 1, porque só existe um critério implementado; ele
-cresce conforme os outros forem entrando.
+Cada critério traz três coisas: os pontos que concedeu, o máximo que poderia conceder e um
+texto explicando como chegou ao resultado. O `total` é a soma dos pontos e o
+`maximo_possivel` é a soma dos máximos, então os dois crescem sozinhos a cada critério que
+entra. Hoje valem 2 e 2, porque existem dois critérios.
 
 ## Estrutura do projeto
 
 | Arquivo                             | Função                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `server.js`                         | O serviço. Recebe requisições, valida, classifica, grava e devolve as respostas.                         |
-| `server.test.js`                    | 23 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
+| `server.test.js`                    | 24 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
 | `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações e dados de mercado.            |
 | `evidencias.test.js`                | 7 testes do módulo de evidências, também com arquivos temporários.                                       |
 | `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua às evidências registradas.                    |
-| `nota.test.js`                      | 6 testes do cálculo da nota, sem HTTP e sem disco.                                                        |
+| `nota.test.js`                      | 10 testes do cálculo da nota, sem HTTP e sem disco.                                                       |
 | `testar-evidencias.js`              | Script de verificação manual do módulo de evidências.                                                     |
 | `package.json`                      | Nome do projeto e os comandos `start` e `test`.                                                          |
 | `validacoes.jsonl`                  | Registro das validações recebidas (gerado em execução, não versionado).                                  |
@@ -156,17 +168,17 @@ nativo do Node.js.
 ## Estado do projeto
 
 Fase intermediária: o serviço de validação e classificação está funcionando, as rotas de
-evidências estão integradas ao servidor, e o primeiro critério da régua de viabilidade já
-calcula a nota a partir das evidências registradas. São 36 testes automatizados, todos
-passando.
+evidências estão integradas ao servidor, e dois dos cinco critérios da régua de
+viabilidade já calculam a nota a partir das evidências registradas. São 41 testes
+automatizados, todos passando.
 
-O que ainda falta: completar os outros quatro critérios da nota, coletar concorrentes e
+O que ainda falta: completar os três critérios restantes, coletar concorrentes e
 reclamações de verdade, e só então gerar o relatório final.
 
 ## Próximos passos
 
-- Implementar o segundo critério da régua ("tem gente insatisfeita?")
-- Completar os quatro critérios restantes da nota de viabilidade
+- Implementar o terceiro critério da régua
+- Completar os três critérios restantes da nota de viabilidade
 - Coletar concorrentes reais e extrair reclamações de usuários
 - Integrar um modelo de linguagem e busca semântica (RAG)
 - Gerar relatório final em PDF
