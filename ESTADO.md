@@ -5,10 +5,13 @@ começa por aqui para saber onde o projeto está.
 
 ## Pipeline de evolução
 
-Resumo do projeto para quem chega agora. O padrão desta seção está em
-`relatorios/TEMPLATE-PIPELINE.md`, e ela aparece também, ao final, em todo relatório novo.
-**Ela é atualizada a cada tarefa concluída.** A lista do que foi feito é cumulativa: item
+Resumo do projeto para quem chega agora. O padrão destas seções está em
+`relatorios/TEMPLATE-PIPELINE.md`, e elas aparecem também, ao final, em todo relatório novo.
+**Elas são atualizadas a cada tarefa concluída.** A lista do que foi feito é cumulativa: item
 concluído sai da lista do que falta.
+
+Quem valida o quê está em **Passagem de bastão**, mais abaixo. O formato dos dados está em
+`CONTRATO.md`.
 
 ### Onde estamos
 
@@ -103,6 +106,35 @@ Estas regras valem para todas as tarefas, a partir da Tarefa 14.
   sessão. A verificação é feita por testes automatizados, que sobem o servidor em porta
   efêmera e fazem requisições HTTP reais.
 - **Cole a saída real dos comandos. Não invente números.**
+- **Todo relatório responde às seis perguntas da Auditoria Red Team**, antes do pipeline de
+  evolução. Resposta honesta vale mais que frase otimista; pergunta sem resposta recebe
+  "Nao identificado nesta tarefa", nunca invenção.
+- **Toda tarefa que adicionar, remover ou alterar um campo de dado atualiza o
+  `CONTRATO.md` no mesmo commit.** O formato dos dados está descrito em `CONTRATO.md`, na
+  raiz. Campo novo sem contrato é dívida.
+
+## Passagem de bastão
+
+Como a governança deste projeto se sustenta na passagem entre execuções, fica escrito quem
+valida o quê.
+
+| Etapa | Quem faz | O que é conferido | Onde o resultado fica |
+| --- | --- | --- | --- |
+| Especificação | Product Owner | A regra do critério, as faixas e a decisão de produto | Prompt da tarefa, e depois `ESTADO.md` |
+| Execução | Agente executor | Código, testes automatizados e documentação no mesmo commit | Diff do commit |
+| Número reportado | Agente executor | Que a saída colada no relatório é a real, sem número inventado | Seção de saída do relatório |
+| Auditoria Red Team | Agente executor | As seis perguntas, respondidas com honestidade | Seção Red Team do relatório |
+| Contrato de dados | Agente executor | Que todo campo novo ou alterado está em `CONTRATO.md` | `CONTRATO.md` no mesmo commit |
+| Revisão humana | Product Owner | A decisão de produto e a prioridade do que falta | Resposta no início da próxima tarefa |
+
+**Regra de ouro:** quando o Product Owner corrige um número, uma premissa ou um escopo, o
+agente executor não deve apenas corrigir e seguir. Deve registrar a correção no relatório da
+tarefa, porque ela costuma indicar que o número ou a premissa anterior entrou em um
+arquivo que será lido de novo.
+
+O que **não** é validado por agente e precisa de olho humano: a aparência do relatório
+impresso em A4, o comportamento do dashboard no navegador e a verossimilhança das evidências
+de mercado, porque todas as evidências gravadas até hoje são fictícias.
 
 ## O que é o produto
 

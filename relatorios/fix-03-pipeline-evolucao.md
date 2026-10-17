@@ -263,6 +263,165 @@ Nada falhou. Ficou pendente, e é a consequência esperada de criar um padrão:
 5. **Números da documentação**: não mudaram. Segue 79 testes (41 em `server.test.js`, 15 em
    `evidencias.test.js`, 23 em `nota.test.js`).
 
+## Auditoria Red Team
+
+Resposta às seis perguntas obrigatórias, sobre o estado do projeto depois desta tarefa. As
+respostas de comportamento foram conferidas executando o código, não de memória.
+
+### 1. Os 3 maiores pontos de falha sob alto tráfego
+
+**a) Event loop bloqueado por I/O síncrono, em requisição.** Toda leitura e escrita é
+`fs.readFileSync` e `fs.appendFileSync`. `listarEvidencias` lê o arquivo inteiro, e
+`GET /relatorio/:id` faz isso **duas vezes**: uma para buscar a validação e outra para as
+evidências. Numa única requisição, o processo para de atender qualquer outro cliente. É o
+primeiro ponto a quebrar, e quebra de forma total, não gradual.
+
+**b) Sem limite de requisições nem autenticação.** `express.json` limita o corpo a 100 KB, e
+é só isso. Não há rate limit, não há autenticação, não há teto de registros. `POST /evidencias`
+aceita chamadas indefinidas, e cada uma acrescenta uma linha ao arquivo. Um `GET /nota`
+recebe o arquivo inteiro sem paginação.
+
+**c) Arquivo `.jsonl` como banco, sem backup e em disco local.** O arquivo é a única fonte
+de verdade dos dados, é ignorado pelo Git e está sem backup. Se o disco encher ou falhar, a
+perda é total, e não há segunda via. Some-se a isso que a gravação é só *append*: não existe
+caminho no código para remover ou corrigir um registro.
+
+### 2. Onde há alucinação lógica neste fluxo
+
+**a) A régua conta quantidade de um `tipo`, e o `tipo` é uma string que o cliente inventa.**
+Esta é a falha lógica mais grave do projeto. Registrar duas evidências com
+`"tipo": "concorrente"` concede 1 ponto, e o sistema não tem como saber se elas são reais.
+Não existe verificação de fonte, nem de data, nem de vínculo com um site real. A nota mede
+**quantidade declarada**, não qualidade de mercado. Um relatório que diz `SEGUIR` está
+medindo a vontade de quem digitou, não o mercado.
+
+**b) Não há verificação de duplicidade.** Nenhum código confere se a mesma fonte já foi
+registrada. As mesmas três evidências podem entrar com `fonte` idêntica e viram três
+concorrentes, o que concede os pontos de `tem_gente` e de `cabe_mais_um` de uma vez. A
+deduplicação é o antídoto mais óbvio contra a falha (a), e não existe.
+
+**c) `cabe_mais_um` pune mercado saturado como se o mercado não existisse.** Com 5 ou mais
+concorrentes, o critério vale 0. Uma ideia num mercado claramente existente, porém saturado,
+perde o ponto. Quem quisesse maximizar a nota teria um incentivo real para registrar
+exatamente 4 concorrentes. O critério está modelado como premissa do PO, e está aqui para
+ser contestada se um dia a régua for calibrada com dado real.
+
+**d) A classificação `mobile`/`outro` é por substring, e produz falso positivo verificável.**
+Conferido agora no código: `"Pineapple shop"` é classificado como `mobile`, porque
+`Pineapple` contém `app`. O mesmo teste classifica corretamente `Apple Watch` e
+`aplicativo de shear`. A ideia do usuário é que um pedaço de fruta vire aplicativo.
+
+**e) `ideia_relacionada` não é validada contra a validação.** Uma evidência pode trazer
+`id_validacao` de uma validação e `ideia_relacionada` com outro texto, e o sistema aceita
+sem reclamar. As duas informações podem discordar sem que nada acuse.
+
+**f) O veredito não sabe *qual* critério falhou.** `4 de 5` é `SEGUIR` venha de onde vier. Um
+ponto em `alguem_paga` e nenhum em `cabe_mais_um` produz a mesma nota e o mesmo veredito que
+o inverso. A informação existe no campo `criterios`, e o veredito não a usa.
+
+### 3. O que acontece se um arquivo `.jsonl` for corrompido
+
+Conferido executando o código com um arquivo de teste:
+
+- **`evidencias.jsonl` com uma linha inválida: `listarEvidencias` lança exceção.** A
+  exceção sai da leitura e **não é tratada** por nenhuma das rotas. O resultado é resposta
+  **500**, e ela atinge `GET /evidencias`, `GET /nota` e `GET /relatorio/:id`. Uma única
+  linha corrompida no fim do arquivo **derruba a leitura de todas as evidências**. Isso
+  inclui o relatório, ou seja, um arquivo parcialmente danificado quebra um produto que já
+  estava funcionando.
+- **`validacoes.jsonl` com uma linha inválida: `buscarValidacao` ignora a linha.** O `try`
+  com `continue` faz a leitura seguir, e a validação procurada é encontrada normalmente,
+  desde que esteja depois da linha ruim.
+
+Ou seja: os dois arquivos têm **comportamentos opostos** diante de corrupção, e o
+comportamento perigoso é o do arquivo de evidências. A falha é assimétrica por construção, e
+ninguém testou esse cenário: não há teste de `.jsonl` corrompido no projeto.
+
+### 4. O que acontece se dois requests chegarem ao mesmo tempo
+
+**Num único processo Node, a gravação não se embaralha.** `appendFileSync` é síncrono e
+bloqueante: o Node executa um statement por vez, então duas requisições concorrentes não
+intercalam bytes no arquivo. Isso é um ponto a favor do desenho atual.
+
+**O que existe é serializacao com espera, nao concorrencia.** Como o I/O bloqueia o event
+loop, a segunda requisição **aguarda** a primeira. Nenhuma requisição falha por isso. O custo
+é de vazão: a taxa de atendimento é a recíproca do tempo de I/O, e **todo** processamento de
+outros clientes para durante cada operação de disco.
+
+**Não verificado, e é uma lacuna real:** o comportamento com **dois processos** lendo e
+escrevendo o mesmo arquivo não foi testado, e o projeto não tem trava de arquivo. Rodar duas
+instâncias em paralelo, coisa plausível em deploy, não tem garantia de que as escritas de
+linha longa não se intercalem. Isso é **Nao identificado nesta tarefa**.
+
+**O risco maior de concorrência aqui não é corrupção de arquivo, é perda de dado:** com duas
+pessoas validando ao mesmo tempo, as duas gravações entram, e o sistema não tem nenhum
+mecanismo de serializacao entre "validar ideia" e "registrar evidência" — o `id_validacao`
+precisa ser repassado pelo cliente, e uma requisição que chega fora de ordem vincula a
+evidência a um id que ainda não foi lido pelo coletor.
+
+### 5. O que um atacante faria com este sistema
+
+**a) Envenenar a nota de qualquer ideia, sem autenticação.** `POST /evidencias` é público.
+Com o `id_validacao` de uma validação, o atacante registra duas evidências `concorrente`, uma
+`reclamacao`, uma `monetizacao` e uma `alcance`. A nota vai a 5 de 5 e o veredito vira
+`SEGUIR`. **Não há nada que impeça**: não há autenticação, não há verificação de fonte, não
+há teto de registros. O relatório daquela ideia passa a afirmar que o mercado é bom, com
+citações inventadas. Este é o ataque mais direto e o de maior impacto, porque não exige
+conhecimento técnico: basta chamar a API.
+
+**b) Enumerar relatórios alheios.** O `id` é `<timestamp em ms>-<6 caracteres base36>`. O
+prefixo é `Date.now()`, que é monotônico e aproximadamente público: quem valida uma ideia
+sabe o próprio timestamp com precisão de milissegundo. O sufixo tem 2.176.782.336 combinações,
+o que **parece** forte, mas com a janela de timestamp conhecida o espaco de busca efetivo e bem
+menor que isso, e não há bloqueio de tentativa. Como o relatório abre com `200` para qualquer id
+existente e **não há controle de acesso**, o atacante consegue baixar relatórios de outros
+usuários por força bruta.
+
+**c) Encher o disco.** `POST /evidencias` em laço, sem limite de taxa e sem teto de
+registros, escreve linhas indefinidamente. Como a escrita é bloqueante, isso também degrada o
+serviço para os demais enquanto escreve. Combina com a ausência de backup: o disco cheio
+atinge exatamente o arquivo que não tem cópia.
+
+**d) Injeção de HTML no relatório: bloqueada.** Este ponto foi conferido e **está
+protegido**. `escapar()` transforma `<script>alert(1)</script>` em
+`&lt;script&gt;...`, e a verificação está num teste que falha se o HTML deixar de conter
+`<script`. O relatório não tem JavaScript, o que reduz muito a superfície.
+
+**e) A página de 404 devolve o id sem escape completo.** `paginaNaoEncontrada` remove `<` e
+`>` do id, mas não escapa aspas. Como o id é inserido em **corpo de texto**, e não em
+atributo, isso não quebra a página hoje. É uma linha frágil: mudar esse id para dentro de um
+atributo abriria XSS.
+
+**f) O servidor escuta em todas as interfaces.** `app.listen(port)` sem `host` escuta em
+todas as interfaces, e o projeto não tem firewall, TLS nem autenticação. Não é uma falha do
+código, é a ausência do controle de acesso que já está registrado como pendência.
+
+### 6. Qual é a mentira mais confortável que este relatório conta
+
+**A que este relatório conta: "79 testes, todos passando" soa como garantia de qualidade, e
+não é.** Os 79 testes cobrem caminho feliz e alguns caminhos de erro, com servidor em porta
+efêmera e requisição HTTP real. O que **não** existe em lugar nenhum do projeto:
+
+- nenhum teste de concorrência, nenhum de carga, nenhum de arquivo corrompido;
+- **nenhum teste roda navegador**, então o dashboard, o veredito exibido e o aviso de cópia
+  nunca foram executados de verdade. As asserções do dashboard procuram texto no HTML, e
+  isso não prova que a tela funciona;
+- **o relatório A4 nunca foi visto por ninguém.** As asserções confirmam `@page`,
+  `size: A4`, `margin: 2cm` e `@media print` presentes no texto — que é o oposto de ver a
+  impressão;
+- a auditoria acima encontrou quatro defeitos que nenhum teste pegaria: `Pineapple` virando
+  `mobile`, `.jsonl` corrompido derrubando todas as leituras, ID enumerável e nota
+  envenenável por chamada pública.
+
+Ou seja: os testes dão uma **sensação** de solidez que a auditoria não confirma. A frase
+honesta seria "79 testes cobrindo regras de negócio e o contrato HTTP, sem cobertura de
+concorrência, de integridade de arquivo e de navegador".
+
+E há uma segunda mentira, menor e maisstructural: o exemplo de resposta do README mostra
+nota 5 de 5 com `SEGUIR`, o que parece o produto funcionando. Com os dados que existem hoje
+na máquina, a nota real é 1 de 5 com `PARAR`, e **nenhuma evidência registrada é real** — todas
+as que existem são fictícias, digitadas à mão nas Tarefas 05 e 21.
+
 ## Pipeline de evolução
 
 ### Onde estamos
