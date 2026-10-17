@@ -740,8 +740,16 @@ test('GET /dashboard: 200 com HTML, formulário e botão de copiar', async () =>
     assert.match(corpo, /id="r-nota"/);
     assert.match(corpo, /id="r-veredito"/);
 
-    // Botão de copiar o link do relatório.
+    // Botão de copiar o link do relatório, com aviso visual de confirmação.
     assert.match(corpo, /Copiar link do relatório/);
+    assert.match(corpo, /id="aviso-copia"/);
+    assert.match(corpo, /class="aviso oculto"/);
+    assert.match(corpo, /Link copiado!/);
+    assert.match(corpo, /Erro ao copiar/);
+
+    // O aviso começa escondido e some depois de 2 segundos.
+    assert.match(corpo, /\.aviso\.oculto \{\s*\n?\s*display: none;/);
+    assert.match(corpo, /2000/);
 
     // O JavaScript fala com as rotas da API.
     assert.match(corpo, /\/validar-ideia/);

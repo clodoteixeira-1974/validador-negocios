@@ -11,6 +11,10 @@ body-tmp.json
 conversas/
 briefing-abertura.md
 
+# Relatorios exportados do dashboard ("Salvar como PDF"). Sao saida local, com
+# dados desta maquina, e nao devem ir para o repositorio.
+*Validador de Novos*.pdf
+
 # O padrao .env.* acima tambem ignoraria .env.example, que deve ser
 # versionado como documentacao das variaveis de ambiente.
 !.env.example

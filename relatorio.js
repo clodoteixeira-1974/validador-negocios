@@ -208,8 +208,27 @@ button:disabled {
 
 .aviso {
   margin-top: 12px;
+  padding: 10px 12px;
   font-size: 10pt;
+  line-height: 1.4;
+  color: #245c33;
+  background: #eef6f0;
+  border: 1px solid #cfe3d4;
+  border-radius: 4px;
+  opacity: 1;
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* While it is being shown or hidden. Starts hidden, without taking space. */
+.aviso.oculto {
+  display: none;
+}
+
+/* Errors keep the red tone. */
+.aviso-erro {
   color: #a33a3a;
+  background: #fbf0f0;
+  border-color: #eed6d6;
 }
 
 /* Impressão: folha A4 limpa, sem controles. */
@@ -395,6 +414,7 @@ function gerarHtmlDashboard() {
     <h2>Link do relatório</h2>
     <p class="link-caixa" id="r-link"></p>
     <button id="copiar" type="button">Copiar link do relatório</button>
+    <div id="aviso-copia" class="aviso oculto" role="status" aria-live="polite">Link copiado!</div>
   </div>
 
   <div class="rodape">
@@ -408,12 +428,32 @@ function gerarHtmlDashboard() {
   var botaoEnviar = document.getElementById('enviar');
   var botaoCopiar = document.getElementById('copiar');
   var aviso = document.getElementById('aviso');
+  var avisoCopia = document.getElementById('aviso-copia');
   var resultado = document.getElementById('resultado');
   var linkRelatorio = '';
+  var timerCopia = null;
 
   function mostrarAviso(texto) {
     aviso.textContent = texto;
+    aviso.classList.toggle('aviso-erro', texto !== '');
     aviso.hidden = texto === '';
+  }
+
+  // Mostra o aviso de cópia e o esconde depois de 2 segundos. Clicar de novo
+  // enquanto ele está visível reinicia a contagem, em vez de sumir cedo.
+  function mostrarAvisoCopia(texto, erro) {
+    if (timerCopia !== null) {
+      clearTimeout(timerCopia);
+    }
+
+    avisoCopia.textContent = texto;
+    avisoCopia.classList.toggle('aviso-erro', erro === true);
+    avisoCopia.classList.remove('oculto');
+
+    timerCopia = setTimeout(function () {
+      avisoCopia.classList.add('oculto');
+      timerCopia = null;
+    }, 2000);
   }
 
   function urlBase() {
@@ -471,9 +511,9 @@ function gerarHtmlDashboard() {
 
     try {
       await navigator.clipboard.writeText(linkRelatorio);
-      mostrarAviso('Link copiado.');
+      mostrarAvisoCopia('Link copiado!', false);
     } catch (erro) {
-      mostrarAviso('Nao foi possivel copiar. Selecione o link acima.');
+      mostrarAvisoCopia('Erro ao copiar. Copie manualmente.', true);
     }
   }
 
