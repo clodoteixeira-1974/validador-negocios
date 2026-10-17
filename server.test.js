@@ -444,3 +444,44 @@ test('nenhum teste de /nota grava no evidencias.jsonl de producao', async () => 
 
   assert.equal(depois, antes);
 });
+
+test('POST /nota: 405 com header Allow: GET', async () => {
+  await comServidor(async ({ base, arquivoEvidencias }) => {
+    const resposta = await fetch(`${base}/nota`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    const corpo = await resposta.json();
+
+    assert.equal(resposta.status, 405);
+    assert.equal(resposta.headers.get('allow'), 'GET');
+    assert.deepEqual(corpo, { error: 'Metodo nao permitido', permitido: 'GET' });
+
+    // O GET continua funcionando depois do 405.
+    const depois = await getNota(base);
+    assert.equal(depois.status, 200);
+    assert.equal(depois.corpo.total, 0);
+
+    // Nenhum arquivo foi criado ou alterado por causa do 405.
+    assert.equal(lerLinhas(arquivoEvidencias).length, 0);
+  });
+});
+
+test('PUT /evidencias: 405 com header Allow: GET, POST', async () => {
+  await comServidor(async ({ base, arquivoEvidencias }) => {
+    const resposta = await fetch(`${base}/evidencias`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(evidenciaValida({ fonte: 'Nao deve ser gravada' }))
+    });
+    const corpo = await resposta.json();
+
+    assert.equal(resposta.status, 405);
+    assert.equal(resposta.headers.get('allow'), 'GET, POST');
+    assert.deepEqual(corpo, { error: 'Metodo nao permitido', permitido: 'GET, POST' });
+
+    // O PUT não pode ter gravado evidência nenhuma.
+    assert.equal(lerLinhas(arquivoEvidencias).length, 0);
+  });
+});

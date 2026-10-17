@@ -63,7 +63,7 @@ Para rodar os testes:
 npm test
 ```
 
-São 41 testes automatizados, todos passando.
+São 43 testes automatizados, todos passando.
 
 Dois exemplos de chamada:
 
@@ -111,6 +111,7 @@ curl http://localhost:3000/nota
 | GET    | `/evidencias`      | `200` com `{"total": N, "evidencias": [...]}`; com nada registrado, `{"total": 0, "evidencias": []}`     |
 | outro  | `/evidencias`      | `405` com o cabeçalho `Allow: GET, POST` — a rota não aceita esse método                                  |
 | GET    | `/nota`            | `200` com `{"criterios": {...}, "total": N, "maximo_possivel": N}` — a nota a partir das evidências     |
+| outro  | `/nota`            | `405` com o cabeçalho `Allow: GET` — a rota não aceita esse método                                     |
 | GET    | qualquer outra     | `404` com `{"error": "Rota nao encontrada", "caminho": "..."}`                                         |
 
 O corpo da resposta é sempre JSON, inclusive nos casos de erro.
@@ -146,7 +147,7 @@ entra. Hoje valem 2 e 2, porque existem dois critérios.
 | Arquivo                             | Função                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `server.js`                         | O serviço. Recebe requisições, valida, classifica, grava e devolve as respostas.                         |
-| `server.test.js`                    | 24 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
+| `server.test.js`                    | 26 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
 | `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações e dados de mercado.            |
 | `evidencias.test.js`                | 7 testes do módulo de evidências, também com arquivos temporários.                                       |
 | `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua às evidências registradas.                    |
@@ -169,7 +170,7 @@ nativo do Node.js.
 
 Fase intermediária: o serviço de validação e classificação está funcionando, as rotas de
 evidências estão integradas ao servidor, e dois dos cinco critérios da régua de
-viabilidade já calculam a nota a partir das evidências registradas. São 41 testes
+viabilidade já calculam a nota a partir das evidências registradas. São 43 testes
 automatizados, todos passando.
 
 O que ainda falta: completar os três critérios restantes, coletar concorrentes e

@@ -137,11 +137,17 @@ function createApp(opcoes = {}) {
     }
   });
 
-  // Calcula a nota a partir das evidencias registradas. Por enquanto so existe
-  // o criterio "tem gente?". A nota e geral: conta todos os concorrentes.
+  // Calcula a nota a partir das evidencias registradas. Os criterios vem do
+// modulo nota.js. A nota e geral: conta todos os concorrentes e reclamacoes.
   app.get('/nota', (req, res) => {
     const evidencias = listarEvidencias(arquivoEvidencias);
     return res.json(calcularNota(evidencias));
+  });
+
+  // Qualquer outro metodo em /nota: 405 com Allow: GET
+  app.all('/nota', (req, res) => {
+    res.set('Allow', 'GET');
+    return res.status(405).json({ error: 'Metodo nao permitido', permitido: 'GET' });
   });
 
   // Qualquer outro metodo em /evidencias: 405 com Allow: GET, POST

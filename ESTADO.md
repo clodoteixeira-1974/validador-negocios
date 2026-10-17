@@ -47,7 +47,7 @@ relatório final ainda não existem.
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 41 testes automatizados (24 em `server.test.js` + 7 em `evidencias.test.js` + 10 em
+- 43 testes automatizados (26 em `server.test.js` + 7 em `evidencias.test.js` + 10 em
   `nota.test.js`)
 
 ## O que não existe ainda
@@ -93,7 +93,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 
 - Servidor: não está rodando. Para iniciar: `npm start`
 - Porta padrão: 3000 (configurável via `PORT`)
-- Testes: `npm test` (41 passando)
+- Testes: `npm test` (43 passando)
 - Repositório GitHub: https://github.com/clodoteixeira-1974/validador-negocios
 - Branch principal: `main`
 
@@ -102,7 +102,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 41 testes automatizados
+npm test        # roda os 43 testes automatizados
 ```
 
 Exemplos de chamada:
