@@ -71,12 +71,40 @@ o link, lê na tela e, se quiser o arquivo, usa "Salvar como PDF" do próprio na
 escolha mantém o projeto com uma única dependência.
 
 - **`/dashboard`** — formulário para enviar a ideia, resultado na tela e botão para copiar o
-  link do relatório.
+  link do relatório. Abre com um aviso de que é um projeto de portfólio, e o rodapé aponta o
+  perfil do autor e o código-fonte.
 - **`/relatorio/:id`** — relatório daquela validação, com a ideia, a data, a nota, o
   veredito, o detalhamento dos cinco critérios e as evidências relacionadas. O `id` na URL é
   um UUID v4, gerado com entropia criptográfica: ele é adivinhável só por força bruta.
 
 Quem tem o link abre o relatório. **Não há controle de acesso, e o link é a única proteção.**
+
+## Expiração do link, em 30 dias
+
+Cada validação recebe, na hora em que é criada, um `expires_at`: o instante 30 dias à
+frente, em ISO 8601. Ele volta na resposta de `POST /validar-ideia`, é gravado junto do
+registro e aparece no rodapé do relatório e no dashboard.
+
+`GET /relatorio/:id` compara essa data com o agora:
+
+| Situação | Resposta |
+| --- | --- |
+| dentro do prazo | `200`, com o relatório |
+| prazo vencido | `410`, com uma página HTML dizendo que o link expirou |
+| validação antiga, sem `expires_at` | `200`, com o relatório |
+
+O `410` e não `404` porque a validação continua existindo: o que deixou de valer foi o
+acesso ao relatório, e não a ideia. A diferença importa para quem consome a API.
+
+**O prazo é do link, não do documento.** Um relatório impresso ou salvo em PDF continua
+válido depois que o link expira.
+
+**Validação antiga não expira.** Quem foi validado antes de o campo existir não tem
+`expires_at`, e o relatório dele abre normalmente. Nada foi inventado para preencher a
+data, e o rodapé desses relatórios avisa que não há prazo.
+
+Isso encurta a janela de exposição de um link vazado, mas **não é controle de acesso**:
+quem tem o link tem o acesso enquanto ele valer, e não há como revogar antes do prazo.
 
 O CSS é embutido nas duas páginas e não carrega fonte, imagem ou biblioteca externa. A
 folha está dimensionada para A4 com margem de 2 cm, e as regras de impressão escondem botões
@@ -84,6 +112,33 @@ e painéis, de modo que "Imprimir" sai limpo.
 
 O projeto foi construído em etapas pequenas, cada uma com testes automatizados e um
 relatório em `relatorios/` explicando o que foi feito e por quê.
+
+## Segurança e avisos
+
+O serviço é público, de portfólio, e é honesto sobre isso. O que está implementado:
+
+| Medida | Onde | O que faz |
+| --- | --- | --- |
+| Aviso de portfólio | topo do dashboard | Diz que os dados são fictícios ou de demonstração |
+| Aviso de qualidade | topo do dashboard | Diz que a nota depende da qualidade das evidências |
+| Aviso de verificação | rodapé do relatório | Diz que não há verificação de fonte automática |
+| Expiração de link | `GET /relatorio/:id` | Link para de funcionar em 30 dias |
+| `id` como UUID v4 | URL do relatório | Torna a enumeração de relatórios inviável |
+
+O que **não** está implementado, e é preciso dizer com todas as letras:
+
+- **Não há autenticação.** Qualquer pessoa que chegue ao serviço valida uma ideia.
+- **`POST /evidencias` é aberto e sem limite de taxa.** Qualquer pessoa pode registrar
+  evidência para qualquer `id_validacao`, inclusive evidência de concorrente, que faz a nota
+  subir. O aviso de qualidade existe, mas **aviso não é controle**.
+- **Não há limite de requisições.** Um laço de `POST` enche o disco, e o I/O é síncrono.
+- **Um link vazado vale até expirar.** Não há revogação, e o prazo de 30 dias é o único
+  limite.
+- **A expiração vale para o relatório, não para o dado.** Quem souber o `id` continua
+  lendo `GET /nota` depois do prazo.
+
+O relatório de cada tarefa tem uma auditoria Red Team que registra isso com o estado real
+do projeto, inclusive o que continua aberto.
 
 ## Como rodar
 
@@ -111,7 +166,7 @@ Para rodar os testes:
 npm test
 ```
 
-São 92 testes automatizados, todos passando.
+São 98 testes automatizados, todos passando.
 
 Dois exemplos de chamada:
 
@@ -182,7 +237,7 @@ curl http://localhost:3000/nota
 | Método | Rota               | Resposta                                                                                             |
 | ------ | ------------------ | --------------------------------------------------------------------------------------------------- |
 | GET    | `/saude`           | `200` com `{"ok": true, "servico": "validador-negocios"}` — verificação de que o serviço está no ar   |
-| POST   | `/validar-ideia`   | `200` com `recebido`, `id`, `ideia`, `tipo` e `timestamp` quando a ideia é válida. O `id` é um UUID v4 e dá acesso ao relatório |
+| POST   | `/validar-ideia`   | `200` com `recebido`, `id`, `ideia`, `tipo`, `timestamp` e `expires_at` quando a ideia é válida. O `id` é um UUID v4 e dá acesso ao relatório, e o `expires_at` marca 30 dias à frente |
 | POST   | `/validar-ideia`   | `400` com `{"error": "..."}` quando o campo `ideia` falta, está vazio ou não é texto                 |
 | POST   | `/validar-ideia`   | `413` quando o corpo do pedido passa de 100 KB                                                       |
 | POST   | `/validar-ideia`   | `400` com `{"error": "JSON invalido"}` quando o corpo enviado não é um JSON bem formado              |
@@ -196,6 +251,8 @@ curl http://localhost:3000/nota
 | outro  | `/nota`            | `405` com o cabeçalho `Allow: GET` — a rota não aceita esse método                                     |
 | GET    | `/dashboard`       | `200` com a página HTML do dashboard: formulário, resultado e botão de copiar link                    |
 | GET    | `/relatorio/:id`   | `200` com o relatório em HTML da validação de id, em folha A4                                          |
+| GET    | `/relatorio/:id`   | `410` em HTML quando o link venceu o `expires_at`. A validação continua existindo                       |
+| GET    | `/relatorio/:id`   | `200` mesmo com o prazo vencido, quando a validação é antiga e não tem `expires_at`                     |
 | GET    | `/relatorio/:id`   | `404` em HTML quando não existe validação com esse id                                                   |
 | GET    | qualquer outra     | `404` com `{"error": "Rota nao encontrada", "caminho": "..."}`                                         |
 
@@ -258,7 +315,7 @@ decisão, e é descrito na seção seguinte.
 | Arquivo                             | Função                                                                                                  |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `server.js`                         | O serviço. Recebe requisições, valida, classifica, grava e devolve as respostas.                         |
-| `server.test.js`                    | 50 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
+| `server.test.js`                    | 56 testes do serviço HTTP, usando o módulo de testes nativo do Node.js.                                 |
 | `evidencias.js`                     | Módulo de evidências: valida e grava registros de concorrentes, reclamações, dados de mercado, monetização e alcance. |
 | `evidencias.test.js`                | 19 testes do módulo de evidências, também com arquivos temporários.                                      |
 | `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua e deriva o veredito.                           |
@@ -285,7 +342,13 @@ Fase avançada: o serviço de validação e classificação está funcionando, a
 completa com os cinco critérios, cada nota vem com um veredito, e a nota é **por ideia**:
 as evidências se vinculam ao identificador da validação, e o relatório mostra a nota
 correta daquela ideia. Há um dashboard em HTML que gera um relatório A4 com link para
-compartilhar. São 92 testes automatizados, todos passando.
+compartilhar. São 98 testes automatizados, todos passando.
+
+O serviço é **público e de portfólio**, com isso avisado na própria interface: banner no
+dashboard, aviso de que os dados são de demonstração, aviso de que a qualidade da nota
+depende da qualidade das evidências, link para o código-fonte e para o perfil do autor no
+rodapé. O relatório repete o aviso de que a evidência não tem verificação de fonte, e
+**todo link expira em 30 dias**.
 
 O que ainda falta: coletar concorrentes e reclamações de verdade, e publicar o serviço.
 
@@ -294,6 +357,7 @@ O que ainda falta: coletar concorrentes e reclamações de verdade, e publicar o
 - Coletar concorrentes reais e extrair reclamações de usuários
 - Publicar o serviço e o dashboard
 - Ligar a coleta de evidências ao id da validação automaticamente
+- Avaliar limite de taxa nas rotas de escrita, agora que o serviço é público
 
 O detalhamento do que falta, das decisões já tomadas e do próximo passo imediato está em
 `ESTADO.md`.

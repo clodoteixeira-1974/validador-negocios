@@ -15,8 +15,10 @@ Quem valida o quê está em **Passagem de bastão**, mais abaixo. O formato dos 
 
 ### Onde estamos
 
-Fase em que a ideia vira um documento legível por outra pessoa: régua completa, veredito,
-nota por ideia e link de compartilhamento. Falta o dado real.
+Fase de exposição do produto: o serviço está funcional de ponta a ponta, com nota por ideia,
+relatório A4 e link de compartilhamento. O PO decidiu que ele é **público e de portfólio**,
+então o produto se declara na própria interface e o link passa a ter prazo. Falta o dado
+real, e falta proteger as rotas de escrita.
 
 ### O que foi feito até aqui
 
@@ -44,16 +46,43 @@ nota por ideia e link de compartilhamento. Falta o dado real.
 - Tarefa 21: nota por ideia, vinculada ao ID da validação
 - fix-02: aviso visual ao copiar link
 - fix-03: pipeline de evolução em todos os relatórios
+- fix-04: governança com Red Team e Contrato de Dados
+- fix-05: leitura resiliente de `.jsonl`
+- fix-06: classificação com limite de palavra
+- fix-07: UUID v4 no ID da validação
+- fix-08: disclaimers, expiração de links e vitrine de portfólio
+
+### Decisões do PO sobre acesso e apresentação
+
+Definidas na Tarefa 25 e implementadas no fix-08:
+
+1. **O serviço é público, de portfólio**, com disclaimer visível na interface
+2. **`POST /evidencias` continua aberto**, com disclaimer sobre qualidade de evidência
+3. **Links de relatório expiram em 30 dias**
+4. **O dashboard mostra o perfil do autor e o link do código-fonte**
+
+O item 4 foi completado com o **nome do autor, `Clodoaldo Teixeira`**, confirmado pelo PO.
+`relatorio.js` concentra `AUTOR_PROJETO` numa única constante, então a troca foi uma edição
+só, e nenhum placeholder chegou ao HTML.
 
 ### O que falta
 
+- [Alta] Limite de taxa em `POST /validar-ideia` e `POST /evidencias`. Com o serviço
+  público e sem limite, um laço de escrita enche o disco, e o I/O é síncrono
 - [Alta] Coleta real de concorrentes e reclamações
 - [Alta] Vínculo automático entre ideia e evidência na hora de coletar
-- [Média] Publicação do serviço, hoje sem controle de acesso
+- [Média] Autenticação ou revogação de link. A expiração de 30 dias fecha o relatório e a
+  nota por ideia, mas não dá revogação antes do prazo, e `GET /evidencias?id=` continua
+  listando as evidências depois dele
+- [Média] Expiração também em `GET /evidencias?id=`, que é a última rota de leitura que
+  aceita um `id` de validação e ainda não confere o prazo
 - [Média] Extração de reclamações
 - [Média] Detecção de perda e reparo de linha corrompida. A leitura já é resiliente e a
   linha ruim é ignorada com aviso, mas ela **continua no arquivo** e não existe caminho para
   removê-la. Junto com a ausência de backup, um arquivo pela metade continua sem reparo
+- [Baixa] Link do perfil do autor no rodapé: hoje aponta para o perfil no GitHub, e não para
+  um site pessoal
+- [Baixa] Migração das validações antigas para `expires_at`. Hoje elas não expiram
 - [Baixa] Integração com LLM e RAG
 - [Baixa] Relatório que compare mais de uma validação
 - [Baixa] Backup dos dados de execução e `.env`
@@ -75,6 +104,10 @@ nota por ideia e link de compartilhamento. Falta o dado real.
   neste arquivo** na mesma tarefa
 - **Convenção de nomes**: `tarefa-NN` para código, `doc-NN` para documentação, `fix-NN` para
   correções
+- **Serviço público avisado, não bloqueado**: a decisão do PO trocou autenticação por
+  transparência. É válido para portfólio e **não é válido como garantia**
+- **Expiração de 30 dias no link do relatório**, com `expires_at` gravado e `410` na leitura
+- **Validação antiga sem `expires_at` nunca expira**, por compatibilidade deliberada
 
 O motivo de cada decisão está na seção "Decisões tomadas e por quê".
 
@@ -83,7 +116,7 @@ O motivo de cada decisão está na seção "Decisões tomadas e por quê".
 - **Comando `memory` inexistente**, pedido pelo `AGENTS.md`. Alternativa: ler este arquivo
 - **Sem backup dos `.jsonl`**, que são ignorados pelo Git e vivem só na máquina local
 - **Sem `.env`**, que vai ser necessário quando houver LLM
-- **Link de compartilhamento sem controle de acesso**
+- **Link de compartilhamento sem controle de acesso**, agora com expiração de 30 dias
 - **`navigator.clipboard` exige contexto seguro**: por HTTP fora de `localhost` a cópia
   falha
 
@@ -192,12 +225,28 @@ dados de verdade e o relatório final ainda não existem.
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 92 testes automatizados (50 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
+- 101 testes automatizados (59 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
   `nota.test.js`)
 - **Leitura de `.jsonl` resiliente e unificada**: `validacoes.jsonl` e `evidencias.jsonl` são
   lidos pela mesma função, em `jsonl.js`. Linha corrompida é ignorada com aviso em
   `console.warn`, e as demais linhas continuam sendo servidas. Uma linha ruim não devolve
   500 em nenhuma rota. O formato está em `CONTRATO.md`
+- **`id` de validação em UUID v4**, por `crypto.randomUUID()`, com 122 bits de entropia
+  criptográfica. O formato antigo, `<timestamp>-<6 caracteres>`, era adivinhável por força
+  bruta. O `id` não é segredo: quem tem o link abre o relatório
+- **Expiração de link em 30 dias**: `expires_at` gravado com a validação, devolvido na
+  resposta, mostrado no rodapé do relatório e no dashboard. Vale para **duas** rotas:
+  `GET /relatorio/:id` devolve `410` em HTML, e `GET /nota?id=` devolve `410` em JSON com
+  `{"error": "Este link expirou"}`. A nota geral, sem `?id=`, não tem prazo
+- **Compatibilidade com validação antiga**: as 6 validações anteriores à expiração não têm
+  `expires_at` e **não expiram nunca**. Nada foi migrado, e o rodapé delas avisa que não há
+  prazo. A escolha está justificada em `CONTRATO.md`
+- **Avisos de portfólio na interface**: banner no topo do dashboard dizendo que os dados são
+  fictícios ou de demonstração, aviso de que a nota depende da qualidade das evidências, e
+  rodapé com o perfil do autor e botão "Ver código-fonte" para o repositório
+- **Aviso no relatório** de que as evidências vêm de usuários e não há verificação de fonte
+  automática, seguido da data de expiração do link
+- **Página de link expirado** em HTML simples, sem o CSS pesado do relatório
 
 ## O que não existe ainda
 
@@ -210,6 +259,8 @@ Alinhado ao fluxograma do projeto:
 - RAG
 - Frontend
 - Deploy
+- **Limite de taxa nas rotas de escrita**, que virou pendência com a decisão de publicar
+- **Autenticação ou revogação de link**, que a decisão do PO adiou para depois da validade
 
 ## Decisões tomadas e por quê
 
@@ -225,6 +276,19 @@ Alinhado ao fluxograma do projeto:
   lá; é a cópia do conteúdo de trabalho.
 - **GitHub mantido como backup de histórico git**: guarda o histórico de commits, que o
   MEGA não garante da mesma forma.
+- **Serviço público, avisado como portfólio** (decisão do PO, Tarefa 25). Em vez de
+  autenticar o acesso, o produto se declara: banner no dashboard, aviso de dados de
+  demonstração, aviso de qualidade das evidências, link para o código-fonte e para o autor.
+  É uma escolha legítima para portfólio, e ela **substitui aviso por garantia**: nada no
+  código impede o uso indevido.
+- **`POST /evidencias` continua aberto, com aviso de qualidade** (decisão do PO). Registrar
+  uma evidência e a nota sobe. O aviso diz isso ao leitor do relatório, mas quem escreve
+  não passa por ele.
+- **Link de relatório expira em 30 dias** (decisão do PO). É o limite de exposição de um
+  link vazado, e não controle de acesso: não há revogação antes do prazo.
+- **Validação antiga não expira** (decisão técnica). Tratar o campo ausente como expirado
+  quebraria relatórios que já funcionavam, sem caminho de volta. O custo é dívida
+  declarada, não acidente.
 
 Os dois backups têm papéis diferentes e complementares: o MEGA guarda os arquivos, o
 GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
@@ -250,7 +314,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 92 testes automatizados
+npm test        # roda os 101 testes automatizados
 ```
 
 Exemplos de chamada:
@@ -276,16 +340,24 @@ Para usar outra porta: `PORT=8080 npm start` (Linux/macOS) ou
 
 ## Próximo passo
 
-**Tarefa 22 — coletar concorrentes e reclamações de verdade**. A nota agora é por ideia, e
-isso muda o que a próxima tarefa precisa decidir. A coleta não pode mais ser solta: cada
-evidência coletada precisa saber a qual validação pertence, senão ela cai na nota geral e
-não aparece em relatório nenhum. Ou seja, o coletor precisa do `id` da ideia como entrada.
+**Tarefa 26 — limite de taxa nas rotas de escrita.** A decisão do PO resolveu a questão de
+acesso pelo caminho da transparência, e foi a decisão certa para portfólio. Mas ela deixou
+um buraco que não é de acesso e sim de disponibilidade: sem limite, qualquer pessoa pode
+fazer laço de `POST /validar-ideia` ou `POST /evidencias`, encher o disco e travar o event
+loop, porque o I/O é síncrono. Aviso não protege ninguém disso.
 
-As perguntas para o PO são de produto e de conduta, não de código: de onde vêm os dados, com
-que frequência se busca, se o coletor está proibido de fazer requisições aos sites
-consultados, e se a pessoa valida a evidência coletada antes de entrar no relatório. O
-destino já existe: `POST /evidencias` aceita `id_validacao`, e `validarEvidencia` já
-recusa registro malformado.
+A ordem faz sentido porque limite de taxa é o que torna a publicação segura sem
+autenticação. Sem ele, "público" significa "disponível para ser derrubado".
+
+**Antes disso, uma escolha de escopo que o PO pode querer revisar:** a expiração fecha o
+relatório e a nota por ideia, mas não `GET /evidencias?id=`, que é a última rota de leitura
+aceitando um `id` de validação. Fechá-la é a mesma lógica desta tarefa aplicada a mais uma
+rota, e muda o contrato de `GET /evidencias`.
+
+Depois, a Tarefa 22 segue na fila: coletar concorrentes e reclamações de verdade, com o `id`
+da validação como entrada obrigatória. As perguntas de produto e de conduta continuam as
+mesmas: de onde vêm os dados, com que frequência, se o coletor pode fazer requisição aos
+sites consultados, e se a pessoa valida a evidência antes de ela entrar no relatório.
 
 ## Pendências conhecidas
 
@@ -310,6 +382,18 @@ Permanecem em aberto, todas de ambiente ou de infraestrutura, nenhuma de código
   correção só vale para os dados gravados a partir daqui.
 - **Link de compartilhamento sem controle de acesso**: qualquer pessoa com o link abre o
   relatório, e não há autenticação nem segredo na URL. O `id` agora é um UUID v4, o que
-  **fez o ataque por força bruta caro de tentar**, mas **não controle o acesso**: o link
-  continua sendo a única proteção, e quem o tem, tem o relatório. Se o relatório passar a
-  conter dado sensível, isso precisa ser resolvido antes.
+  **fez o ataque por força bruta caro de tentar**, e o link agora expira em 30 dias, o que
+  **limita a exposição de um link vazado**. Ainda assim **não é controle de acesso**: não há
+  revogação, e quem tem o link tem o relatório enquanto ele valer.
+- **A expiração cobre o relatório e a nota por ideia, mas não `GET /evidencias?id=`.**
+  Quem souber o `id` ainda consegue listar as evidências cruas depois do prazo. Fechar essa rota é
+  a pendência natural seguinte, e ela muda o contrato de `GET /evidencias`.
+- **Validação antiga não expira nunca**, por decisão técnica documentada em `CONTRATO.md`.
+  São 6 registros neste ambiente. O `id` em UUID v4 é o que impede a enumeração desses
+  relatórios, e é por isso que a dívida foi aceita.
+- **`POST /evidencias` sem autenticação nem limite de taxa**: com o serviço público, qualquer
+  pessoa pode registrar evidência para qualquer `id_validacao` e mover a nota. O aviso no
+  relatório é honesto, mas **aviso não é controle**. É o vetor de maior impacto que resta.
+- **Envenenamento de nota é decisão consciente do PO**, não um descuido: `POST /evidencias`
+  fica aberto, e o risco é documentado no relatório do fix-08 e no rodapé de todo relatório.
+  Quem decide rever essa decisão é o PO.

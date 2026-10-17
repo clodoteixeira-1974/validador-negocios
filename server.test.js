@@ -815,9 +815,19 @@ test('GET /dashboard: 200 com HTML, formulário e botão de copiar', async () =>
     assert.match(corpo, /\/nota/);
     assert.match(corpo, /\/relatorio\//);
 
-    // O dashboard não carrega nada de fora.
-    assert.ok(!corpo.includes('http://'), 'nenhuma URL absoluta');
-    assert.ok(!corpo.includes('https://'), 'nenhuma URL absoluta');
+    // O dashboard não carrega nada de fora: sem fonte, script ou imagem externa.
+    // A decisão do PO na Tarefa 25 adicionou link para o GitHub, que é uma URL
+    // absoluta. Por isso a checagem passou a mirar o que é realmente baixado —
+    // <a href> é navegação só quando a pessoa clica, não é recurso carregado.
+    assert.ok(!/<script[^>]+src=/.test(corpo), 'nenhum script externo');
+    assert.ok(!/<link[^>]+href=/.test(corpo), 'nenhuma folha de estilo externa');
+    assert.ok(!/<img[^>]+src=/.test(corpo), 'nenhuma imagem externa');
+    assert.ok(!corpo.includes('@import'), 'nenhum @import de fonte');
+    assert.ok(!/<iframe/.test(corpo), 'nenhum iframe');
+
+    // E os links de portfólio estão lá, como a decisão do PO pede.
+    assert.match(corpo, /<a class="botao-secundario" href="https:\/\/github\.com\/clodoteixeira-1974\/validador-negocios"/);
+    assert.match(corpo, /Ver código-fonte/);
   });
 });
 
@@ -1150,5 +1160,198 @@ test('PUT /evidencias: 405 com header Allow: GET, POST', async () => {
 
     // O PUT não pode ter gravado evidência nenhuma.
     assert.equal(lerLinhas(arquivoEvidencias).length, 0);
+  });
+});
+
+// Reescreve o expires_at da validação gravada no arquivo temporário. Existe para
+// os testes de expiração: em vez de esperar 30 dias, o teste troca a data no
+// arquivo e deixa o servidor decidir. É o mesmo caminho de leitura do produto,
+// então o que está sob teste é o comportamento real, não um mock.
+function definirExpiracao(arquivo, id, expiresAt) {
+  const linhas = lerLinhas(arquivo).map((linha) => {
+    const registro = JSON.parse(linha);
+
+    if (registro.id !== id) {
+      return linha;
+    }
+
+    if (expiresAt === null) {
+      // Simula uma validação anterior à Tarefa 25, gravada sem o campo.
+      delete registro.expires_at;
+    } else {
+      registro.expires_at = expiresAt;
+    }
+
+    return JSON.stringify(registro);
+  });
+
+  fs.writeFileSync(arquivo, `${linhas.join('\n')}\n`, 'utf8');
+}
+
+test('POST /validar-ideia devolve expires_at 30 dias no futuro', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    const antes = Date.now();
+    const r = await post(base, { ideia: 'App para controlar gastos' });
+    const depois = Date.now();
+
+    assert.equal(r.status, 200);
+    assert.ok(r.corpo.expires_at, 'a resposta precisa trazer expires_at');
+
+    const limite = new Date(r.corpo.expires_at).getTime();
+    assert.ok(!Number.isNaN(limite), 'expires_at precisa ser uma data legível');
+    assert.equal(new Date(r.corpo.expires_at).toISOString(), r.corpo.expires_at);
+
+    const trintaDias = 30 * 24 * 60 * 60 * 1000;
+    assert.ok(limite >= antes + trintaDias, 'expires_at deve estar 30 dias à frente');
+    assert.ok(limite <= depois + trintaDias, 'expires_at não pode passar de 30 dias');
+
+    // O campo tem de estar no arquivo também: a expiração sobrevive ao restart.
+    const gravado = lerLinhas(arquivo).map((l) => JSON.parse(l))
+      .find((registro) => registro.id === r.corpo.id);
+
+    assert.ok(gravado, 'a validação precisa estar gravada');
+    assert.equal(gravado.expires_at, r.corpo.expires_at);
+  });
+});
+
+test('GET /relatorio com link no prazo devolve 200 e a data de expiração', async () => {
+  await comServidor(async ({ base }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+
+    assert.ok(validacao.corpo.expires_at, 'sem expires_at não há o que testar');
+
+    const resposta = await fetch(`${base}/relatorio/${validacao.corpo.id}`);
+    const corpo = await resposta.text();
+
+    assert.equal(resposta.status, 200);
+    assert.ok(!corpo.includes('Este link expirou'), 'não pode mostrar a página de expirado');
+
+    const esperado = new Date(validacao.corpo.expires_at)
+      .toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+
+    assert.ok(corpo.includes(`Este link expira em ${esperado}.`),
+      'o relatório precisa mostrar a data de expiração');
+  });
+});
+
+test('GET /relatorio com link expirado devolve 410 e a página de expirado', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+
+    // Um dia no passado: a validação existe, mas o acesso já não vale.
+    definirExpiracao(arquivo, validacao.corpo.id, new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+    const resposta = await fetch(`${base}/relatorio/${validacao.corpo.id}`);
+    const corpo = await resposta.text();
+
+    // 410 Gone, e não 404: a validação existe, o acesso é que não.
+    assert.equal(resposta.status, 410);
+    assert.match(resposta.headers.get('content-type') || '', /html/);
+    assert.ok(corpo.includes('Este link expirou'));
+    assert.ok(!corpo.includes('Validador de Novos Negócios</h1>'),
+      'a página de expirado não é o relatório');
+
+    // A mesma validacao continua existindo para o resto do sistema: uma expiração
+    // não deve apagar a nota nem a validação.
+    assert.equal(lerLinhas(arquivo).length, 1);
+  });
+});
+
+test('validação antiga sem expires_at continua abrindo: 200 (compatibilidade)', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+
+    // Validação gravada antes da expiração existir: o campo some do arquivo.
+    definirExpiracao(arquivo, validacao.corpo.id, null);
+
+    const resposta = await fetch(`${base}/relatorio/${validacao.corpo.id}`);
+    const corpo = await resposta.text();
+
+    assert.equal(resposta.status, 200, 'validação antiga não pode voltar 410');
+    assert.ok(corpo.includes('App para controlar gastos'));
+    assert.ok(!corpo.includes('Este link expirou'));
+
+    // E o rodapé diz que não há data, em vez de ficar calado sobre isso.
+    assert.ok(corpo.includes('não tem data de expiração'));
+  });
+});
+
+test('o dashboard avisa que é projeto de portfólio e aponta o código-fonte', async () => {
+  await comServidor(async ({ base }) => {
+    const resposta = await fetch(`${base}/dashboard`);
+    const corpo = await resposta.text();
+
+    assert.equal(resposta.status, 200);
+    assert.ok(corpo.includes('Este é um projeto de portfólio.'));
+    assert.ok(corpo.includes('Não use para decisões de negócio'));
+    assert.ok(corpo.includes('As evidências são fornecidas por usuários'));
+    assert.ok(corpo.includes('A qualidade da nota'));
+    assert.ok(corpo.includes('Ver código-fonte'));
+    assert.ok(corpo.includes('Desenvolvido por'));
+    assert.ok(corpo.includes('https://github.com/clodoteixeira-1974/validador-negocios'));
+  });
+});
+
+test('o relatório avisa que a evidência não é verificada', async () => {
+  await comServidor(async ({ base }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+    const resposta = await fetch(`${base}/relatorio/${validacao.corpo.id}`);
+    const corpo = await resposta.text();
+
+    assert.ok(corpo.includes('evidências fornecidas por usuários'));
+    assert.ok(corpo.includes('Não há verificação de fonte automática'));
+  });
+});
+
+test('GET /nota?id= com id expirado devolve 410 em JSON', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+    definirExpiracao(arquivo, validacao.corpo.id, new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+    const resposta = await fetch(`${base}/nota?id=${encodeURIComponent(validacao.corpo.id)}`);
+    const corpo = await resposta.json();
+
+    // A expiracao precisa valer para o dado, e nao so para a pagina: sem isso,
+    // fechar o relatorio e nao fechar o vazamento.
+    assert.equal(resposta.status, 410);
+    assert.match(resposta.headers.get('content-type') || '', /json/);
+    assert.deepEqual(corpo, { error: 'Este link expirou' });
+
+    // E o corpo nao pode vazar a nota no meio do erro.
+    assert.equal(corpo.total, undefined);
+    assert.equal(corpo.criterios, undefined);
+  });
+});
+
+test('GET /nota?id= com id valido devolve 200 e a nota da ideia', async () => {
+  await comServidor(async ({ base }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A' }));
+
+    const resposta = await fetch(`${base}/nota?id=${encodeURIComponent(validacao.corpo.id)}`);
+    const corpo = await resposta.json();
+
+    assert.equal(resposta.status, 200);
+    assert.equal(typeof corpo.total, 'number');
+    assert.equal(typeof corpo.maximo_possivel, 'number');
+    assert.ok(corpo.criterios, 'a nota por ideia precisa vir com os criterios');
+  });
+});
+
+test('GET /nota sem ?id= continua devolvendo a nota geral, sem expiracao', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    const validacao = await post(base, { ideia: 'App para controlar gastos' });
+
+    // Todas as validacoes deste teste estao expiradas, e a nota geral continua
+    // de pé: ela nao pertence a uma validacao, entao nao tem prazo.
+    definirExpiracao(arquivo, validacao.corpo.id, new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+    await postEvidencia(base, evidenciaValida({ fonte: 'Concorrente A' }));
+
+    const resposta = await fetch(`${base}/nota`);
+    const corpo = await resposta.json();
+
+    assert.equal(resposta.status, 200);
+    assert.equal(typeof corpo.total, 'number');
+    assert.equal(typeof corpo.maximo_possivel, 'number');
   });
 });

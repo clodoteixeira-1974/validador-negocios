@@ -28,6 +28,7 @@ Gravada em `validacoes.jsonl`. É a unidade que o relatório consegue reabrir pe
 | `ideia` | string | sim | cliente | relatório (bloco "A ideia") |
 | `tipo` | string | sim | servidor, `classificarTipo()` | resposta; relatório |
 | `timestamp` | string ISO 8601 | sim | servidor, `new Date().toISOString()` | relatório, formatado em pt-BR |
+| `expires_at` | string ISO 8601 | sim | servidor, `gerarExpiracao()` | verificação de `GET /relatorio/:id`; resposta; rodapé do relatório |
 
 Formato do `id`: **UUID versão 4**, por exemplo
 `550e8400-e29b-41d4-a716-446655440000`. São 36 caracteres, em formato hexadecimal
@@ -44,6 +45,73 @@ relatório, e **o relatório não tem controle de acesso**.
 O `id` da **Evidência** segue outro formato, `<timestamp em ms>-<6 caracteres base36>`, e
 continua vindo de `gerarId()` dentro de `evidencias.js`. Ele não aparece em URL e não é
 usado como chave de acesso.
+
+### `expires_at`: expiração do link
+
+`expires_at` é o instante em que o link de relatório deixa de funcionar. Vale
+`timestamp + 30 dias`, em ISO 8601, calculado por `gerarExpiracao()` no momento da
+validação. O prazo de 30 dias é decisão do PO, não um padrão do protocolo.
+
+Ele aparece em três lugares: gravado no registro, devolvido na resposta de
+`POST /validar-ideia`, e mostrado no rodapé do relatório e no dashboard.
+
+`GET /relatorio/:id` compara `expires_at` com o instante atual e devolve:
+
+| Situação | Resposta |
+| --- | --- |
+| `expires_at` no futuro | `200`, relatório normal |
+| `expires_at` no passado, ou igual ao agora | `410 Gone`, página HTML de link expirado |
+| `expires_at` ausente (validação antiga) | `200`, relatório normal |
+| `expires_at` ilegível | `200`, relatório normal |
+
+O `410` é deliberado, e não `404`. A diferença importa para quem consome a API: `404`
+diz que a validação não existe, `410` diz que ela **existe** e que o acesso deixou de
+valer. Um relatório expirado continua no arquivo, e a nota dele continua existindo em
+`GET /nota`.
+
+### Onde a expiração é verificada
+
+A expiração vale para **duas** rotas, e vale para o **dado**, não só para a página:
+
+| Rota | Com expiração vencida |
+| --- | --- |
+| `GET /relatorio/:id` | `410`, com HTML de link expirado |
+| `GET /nota?id=<id>` | `410`, com `{"error": "Este link expirou"}` |
+| `GET /nota` (sem `?id=`) | segue `200`: a nota geral não pertence a uma validação |
+
+A verificação em `/nota?id=` foi adicionada depois de uma constatação honesta: fechar só a
+página do relatório deixava o mesmo dado acessível por outra rota. Quem tivesse o `id`
+continuaria lendo a nota depois do prazo, o que faz da expiração uma medida de
+**aparência** — a página some, a informação não.
+
+Por isso a expiração precisa ser conferida onde o dado é servido, e não apenas onde ele é
+mostrado. A nota geral fica de fora de propósito: ela agrega evidências sem vínculo e não
+tem `expires_at` de onde tirar um prazo.
+
+### Compatibilidade com validações antigas
+
+Validações gravadas antes da Tarefa 25 **não têm `expires_at`**. Elas são tratadas como
+**não expiradas**, e o relatório abre normalmente.
+
+A escolha é deliberada, e vale registrar o porquê:
+
+- **Não migrar dado.** Reescrever as linhas antigas exigiria varrer o arquivo e acrescentar
+  um campo com base no `timestamp` de cada registro. Isso inventaria uma expiração que
+  nunca foi comunicada a ninguém, e o arquivo é o dado do usuário.
+- **O custo real é assimétrico.** Se uma validação antiga fosse tratada como expirada, um
+  relatório que funcionavaeria de funcionar, sem caminho de volta. Tratá-la como válida
+  só deixa um relatório aberto por mais tempo — o mesmo estado em que ele já estava.
+- **O campo ausente é raro e datável.** Só as validações anteriores a esta tarefa o têm.
+
+**A consequência é uma dívida, e ela precisa ser dita:** as validações antigas **não
+expiram nunca**. O rodapé do relatório delas diz exatamente isso —
+"Validação anterior à expiração: este link não tem data de expiração" — em vez de ficar
+calado, porque um rodapé sem menção pode ser lido como "não expira" quando o oposto
+também é verdade. O `id` em UUID v4 continua sendo o que impede a enumeração desses
+relatórios antigos, e é por isso que a dívida é aceitável.
+
+`expires_at` ilegível também é tratado como não expirado, pelo mesmo motivo: um campo
+corrompido não deve fechar o acesso a um relatório que a pessoa já tinha.
 
 ## Evidência
 
@@ -83,6 +151,10 @@ Regras de `id_validacao`:
 ## Nota
 
 Devolvida por `GET /nota`. Não é persistida: é recalculada a cada chamada.
+
+A nota **por ideia** (`?id=<id de validação>`) respeita o `expires_at` da validação e devolve
+`410` com `{"error": "Este link expirou"}` quando o prazo venceu. A nota **geral**, sem
+`?id=`, não tem prazo. Detalhes em "Onde a expiração é verificada", na seção Validação.
 
 | Campo | Tipo | Obrigatório | Onde é gerado | Onde é consumido |
 | --- | --- | --- | --- | --- |
@@ -126,7 +198,17 @@ HTML em memória, gerado por `gerarHtmlRelatorio`. Não é gravado em disco.
 | veredito, faixa, explicação | do Veredito | `relatorio.js` | leitor |
 | tabela dos critérios | da Nota | `relatorio.js` | leitor |
 | evidências relacionadas | da Evidência, filtrada por `id_validacao` | `relatorio.js` | leitor |
-| rodapé com data de geração e link do dashboard | fixo + URL da requisição | `relatorio.js` | leitor |
+| rodapé com data de geração e data de expiração do link | fixo + `expires_at` da Validação | `relatorio.js` | leitor |
+| aviso de que a evidência não é verificada | fixo | `relatorio.js` | leitor |
+
+O rodapé traz duas informações sobre o tempo de vida do link: quando o relatório foi
+gerado, e quando o link expira. São coisas diferentes, e confundi-las faria o leitor
+acreditar que um relatório impresso também tem prazo. **O prazo é do link, não do
+documento**: o PDF impresso continua válido depois de expirar.
+
+O aviso "Não há verificação de fonte automática" é fixo e **não depende de haver ou não
+evidência** no relatório. Ele aparece mesmo sem nenhuma evidência registrada, porque a
+afirmação que ele faz é sobre como a nota é construída, e não sobre o que foi coletado.
 
 Todo dado vindo da Validação, da Evidência ou da Nota passa por `escapar()` antes de entrar
 no HTML.
@@ -182,3 +264,17 @@ sumiram. **Não existe** detecção de perda, reparo nem cópia de segurança �
 - **`ideia_relacionada` é texto livre e não é validado contra a Validação.** Uma evidência
   vinculada a um `id_validacao` pode trazer um texto de ideia completamente diferente, e o
   sistema aceita.
+- **A expiração é só do link de leitura.** `expires_at` é gravado junto do registro, e a
+  verificação acontece em `GET /relatorio/:id` e em `GET /nota?id=`. Ela **não** apaga nada:
+  uma validação expirada continua no arquivo, continua contando como evidência válida por
+  `id_validacao` para as notas de outras ideias, e continua sendo aceito como vínculo em
+  `POST /evidencias`.
+- **`GET /evidencias?id=` não verifica expiração.** Ele devolve a lista de evidências
+  vinculadas a um `id`, e essa rota segue aberta depois do prazo. Quem já tem o `id` ainda
+  consegue ler as evidências cruas. Fechá-la é a próxima pendência natural, e ela não foi
+  fechada aqui porque muda o contrato de `GET /evidencias` sem que a tarefa a tenha pedido.
+- **Validação antiga continua válida e continua sem prazo.** Documentado acima, e aceito
+  como dívida: o campo não existe nelas e nada foi inventado para preenchê-lo.
+- **O rodapé do dashboard e o do relatório não têm o mesmo conteúdo.** O do dashboard é
+  vitrine de portfólio (autor e código-fonte); o do relatório é aviso sobre evidência e
+  prazo. Nenhum dos dois declara controle de acesso, porque não existe.

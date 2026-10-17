@@ -10,7 +10,7 @@ const {
 
 const { calcularNota } = require('./nota');
 
-const { gerarHtmlRelatorio, gerarHtmlDashboard } = require('./relatorio');
+const { gerarHtmlRelatorio, gerarHtmlDashboard, escapar, formatarData } = require('./relatorio');
 
 const { lerJsonl, escreverJsonl, avisarLinhasIgnoradas } = require('./jsonl');
 
@@ -117,6 +117,24 @@ function paginaNaoEncontrada(id) {
 </html>`;
 }
 
+// Página de link expirado. Simples de propósito, sem o CSS pesado.
+function paginaExpirada(data) {
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Link expirado — Validador de Novos Negócios</title>
+</head>
+<body style="font-family: Georgia, serif; padding: 40px; color: #1a1a1a;">
+<h1>Este link expirou</h1>
+<p>Os links de relatório expiram em 30 dias.${data ? ` Este link expirou em <strong>${escapar(data)}</strong>.` : ''}</p>
+<p>Você pode gerar um novo relatório enviando a ideia novamente no
+<a href="/dashboard">dashboard</a>.</p>
+</body>
+</html>`;
+}
+
 // Cria o app Express com as rotas. Não abre porta: use listen() quando precisar.
 // Opções: { arquivoValidacoes } para apontar a persistência para outro caminho.
 function createApp(opcoes = {}) {
@@ -139,7 +157,32 @@ function createApp(opcoes = {}) {
     return res.status(405).json({ error: 'Metodo nao permitido', permitido: 'GET' });
   });
 
-  // Endpoint POST /validar-ideia
+  // Días que um link de relatório permanece válido. Decisão do PO: 30 dias.
+const DIAS_EXPIRACAO = 30;
+const MS_POR_DIA = 24 * 60 * 60 * 1000;
+
+// Data de expiração do link de relatório: 30 dias a partir de agora, em ISO.
+// Validação antiga, sem expires_at, é tratada como não expirada — ver CONTRATO.md.
+function gerarExpiracao(agora = Date.now()) {
+  return new Date(agora + DIAS_EXPIRACAO * MS_POR_DIA).toISOString();
+}
+
+// Diz se um link expirou. Sem expires_at, nunca considera expirado.
+function linkExpirado(validacao, agora = Date.now()) {
+  if (!validacao || !validacao.expires_at) {
+    return false;
+  }
+
+  const limite = new Date(validacao.expires_at).getTime();
+
+  if (Number.isNaN(limite)) {
+    return false;
+  }
+
+  return agora >= limite;
+}
+
+// Endpoint POST /validar-ideia
   app.post('/validar-ideia', (req, res) => {
     const resultado = validarIdeia(req.body);
 
@@ -151,7 +194,8 @@ function createApp(opcoes = {}) {
       id: gerarId(),
       ideia: resultado.ideia,
       tipo: classificarTipo(resultado.ideia),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      expires_at: gerarExpiracao()
     };
 
     registrarValidacao(registro, arquivoValidacoes);
@@ -161,7 +205,8 @@ function createApp(opcoes = {}) {
       id: registro.id,
       ideia: registro.ideia,
       tipo: registro.tipo,
-      timestamp: registro.timestamp
+      timestamp: registro.timestamp,
+      expires_at: registro.expires_at
     });
   });
 
@@ -200,8 +245,24 @@ function createApp(opcoes = {}) {
 
 // Calcula a nota a partir das evidencias registradas. Com ?id=<id de validacao>,
   // a nota e da ideia correspondente; sem o parametro, e a nota geral.
+  //
+  // A expiracao vale para a nota da ideia tanto quanto vale para o relatorio. Sem
+  // esta verificacao, fechar a pagina e nao fechar o dado: quem soubesse o id
+  // continuaria lendo a nota depois do prazo, que e o mesmo vazamento por outro
+  // caminho. A nota geral, sem ?id=, nao tem prazo: ela nao pertence a uma
+  // validacao, e nao ha expires_at de onde tirar um.
   app.get('/nota', (req, res) => {
     const filtro = typeof req.query.id === 'string' ? req.query.id : undefined;
+
+    if (filtro !== undefined) {
+      const validacao = buscarValidacao(filtro, arquivoValidacoes);
+
+      // 410 e nao 404, como no relatorio: a validacao existe, o acesso e que nao.
+      if (linkExpirado(validacao)) {
+        return res.status(410).json({ error: 'Este link expirou' });
+      }
+    }
+
     const evidencias = listarEvidencias(arquivoEvidencias, filtro);
     return res.json(calcularNota(evidencias));
   });
@@ -217,6 +278,11 @@ function createApp(opcoes = {}) {
 
     if (!validacao) {
       return res.status(404).type('html').send(paginaNaoEncontrada(String(req.params.id)));
+    }
+
+    // Link expirado responde 410 Gone, e não 404: a validação existe, o acesso é que não.
+    if (linkExpirado(validacao)) {
+      return res.status(410).type('html').send(paginaExpirada(formatarData(validacao.expires_at)));
     }
 
     const evidencias = evidenciasDaValidacao(validacao.id, arquivoEvidencias);

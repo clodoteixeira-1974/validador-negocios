@@ -1,13 +1,20 @@
 // Geração das páginas HTML do Validador de Novos Negócios.
 //
 // São duas páginas:
-//   - o relatório de uma validação, meant para ser lido e impresso em A4;
+//   - o relatório de uma validação, feito para ser lido e impresso em A4;
 //   - o dashboard, onde se envia uma ideia e se acompanha o resultado.
 //
 // Nenhuma das duas depende de fonte externa, framework ou biblioteca: o CSS é
 // embutido no próprio HTML e a única concessionária é a API, à qual a página
 // fala por fetch. Isso mantém o projeto com a única dependência que tem
 // (express), sem abrir mão de um documento imprimível.
+
+// Identidade do projeto, usada nos rodapés do dashboard e do relatório.
+// Ficam aqui, e não repetidas no HTML, para que trocar o nome do autor seja uma
+// edição de um lugar só.
+const AUTOR_PROJETO = 'Clodoaldo Teixeira';
+const PERFIL_AUTOR = 'https://github.com/clodoteixeira-1974';
+const REPOSITORIO = 'https://github.com/clodoteixeira-1974/validador-negocios';
 
 const CSS = `
 * { box-sizing: border-box; }
@@ -231,6 +238,84 @@ button:disabled {
   border-color: #eed6d6;
 }
 
+/* Aviso de portfólio, no topo do dashboard. Forte o bastante para ser lido
+   antes de qualquer campo, e escondido na impressão: quem imprime quer o
+   relatório, não o banner. */
+.banner {
+  margin: 0 0 22px;
+  padding: 12px 14px;
+  font-size: 10pt;
+  line-height: 1.5;
+  color: #4a4326;
+  background: #fbf7e8;
+  border: 1px solid #e6dcb4;
+  border-radius: 4px;
+}
+
+.banner strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.banner p {
+  margin: 4px 0 0;
+}
+
+/* Aviso menor, de qualidade de evidência. */
+.banner-suave {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  font-size: 9.5pt;
+  line-height: 1.5;
+  color: #555550;
+  background: #f7f7f4;
+  border: 1px solid #e2e2de;
+  border-radius: 4px;
+}
+
+/* Rodapé do relatório: o aviso sobre verificação de fonte. */
+.disclaimer {
+  margin: 10px 0 0;
+  font-size: 9pt;
+  line-height: 1.5;
+  color: #777770;
+}
+
+/* Vitrine de portfólio no rodapé do dashboard. */
+.vitrine {
+  margin-top: 26px;
+  padding-top: 14px;
+  font-size: 9.5pt;
+  color: #555550;
+  border-top: 1px solid #d8d8d4;
+}
+
+.vitrine p {
+  margin: 0 0 8px;
+}
+
+.vitrine-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Botão do rodapé: mesmo desenho do botão principal, sem o margin-top. */
+.botao-secundario {
+  display: inline-block;
+  padding: 8px 16px;
+  font-family: inherit;
+  font-size: 10pt;
+  color: #1a1a1a;
+  text-decoration: none;
+  border: 1px solid #8a8a82;
+  background: #f0f0ec;
+}
+
+.botao-secundario:hover {
+  background: #e6e6e0;
+}
+
 /* Impressão: folha A4 limpa, sem controles. */
 
 @page {
@@ -254,6 +339,11 @@ button:disabled {
   .painel, .link-caixa, button, .aviso {
     display: none;
   }
+
+  /* O disclaimer do relatório continua na impressão: ele é o aviso que
+     acompanha o papel quando o documento sai do site. O banner e a vitrine do
+     dashboard somem junto com o .painel, que já não é impresso. */
+  .disclaimer { color: #1a1a1a; }
 
   .relatorio { display: block !important; }
 
@@ -286,15 +376,29 @@ function formatarData(iso) {
   return data.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
 
-// O rodapé do relatório: quando foi gerado e onde está o dashboard.
-function gerarRodape(base) {
+// O rodapé do relatório: quando foi gerado, a data de expiração do link, o
+// aviso de que a evidência não é verificada, e onde está o dashboard.
+//
+// A expiração vem do expires_at da validação. Validação antiga, sem esse campo,
+// não expira nunca: o texto diz isso em vez de omitir a linha, porque um rodapé
+// calado pode ser lido como "não expira" quando o oposto também é verdade.
+function gerarRodape(base, validacao) {
   const agora = new Date().toLocaleString('pt-BR', { timeZone: 'UTC' });
+  const expiracao = validacao && validacao.expires_at
+    ? `Este link expira em ${escapar(formatarData(validacao.expires_at))}.`
+    : 'Validação anterior à expiração: este link não tem data de expiração.';
 
   return `
     <div class="rodape">
       Gerado em ${escapar(agora)} (UTC) &middot;
+      ${expiracao} &middot;
       <a href="${escapar(base)}/dashboard">abrir o dashboard</a>
-    </div>`;
+    </div>
+    <p class="disclaimer">
+      Este relatório é gerado a partir de evidências fornecidas por usuários.
+      Não há verificação de fonte automática. A nota reflete a qualidade das
+      evidências registradas, e não uma checagem independente dos fatos.
+    </p>`;
 }
 
 // Monta o relatório de uma validação. Recebe o registro da validação, o objeto
@@ -373,7 +477,7 @@ function gerarHtmlRelatorio(validacao, nota, evidencias, base) {
     </tbody>
   </table>
 ${blocoEvidencias}
-${gerarRodape(base || '')}
+${gerarRodape(base || '', validacao)}
 </main>
 </body>
 </html>`;
@@ -392,12 +496,21 @@ function gerarHtmlDashboard() {
 </head>
 <body>
 <main class="painel">
+  <div class="banner">
+    <strong>Este é um projeto de portfólio.</strong>
+    <p>Os dados são fictícios ou de demonstração. Não use para decisões de negócio
+    reais.</p>
+  </div>
+
   <h1>Validador de Novos Negócios</h1>
   <p class="subtitulo">Descreva a ideia e veja a nota de viabilidade.</p>
 
   <label for="ideia">Sua ideia de negócio</label>
   <textarea id="ideia" placeholder="Ex.: App para controlar gastos"></textarea>
   <button id="enviar" type="button">Validar ideia</button>
+
+  <p class="banner-suave">As evidências são fornecidas por usuários. A qualidade da nota
+  depende da qualidade das evidências.</p>
 
   <p class="aviso" id="aviso" hidden></p>
 
@@ -413,12 +526,17 @@ function gerarHtmlDashboard() {
 
     <h2>Link do relatório</h2>
     <p class="link-caixa" id="r-link"></p>
+    <p class="banner-suave" id="r-expira"></p>
     <button id="copiar" type="button">Copiar link do relatório</button>
     <div id="aviso-copia" class="aviso oculto" role="status" aria-live="polite">Link copiado!</div>
   </div>
 
-  <div class="rodape">
-    <a href="/relatorio">Validador de Novos Negócios</a>
+  <div class="vitrine">
+    <p>Projeto de portfólio. Desenvolvido por
+      <a href="${escapar(PERFIL_AUTOR)}">${escapar(AUTOR_PROJETO)}</a>.</p>
+    <div class="vitrine-links">
+      <a class="botao-secundario" href="${escapar(REPOSITORIO)}" rel="noopener">Ver código-fonte</a>
+    </div>
   </div>
 </main>
 
@@ -495,6 +613,20 @@ function gerarHtmlDashboard() {
 
       linkRelatorio = urlBase() + '/relatorio/' + encodeURIComponent(validacao.id);
       document.getElementById('r-link').textContent = linkRelatorio;
+
+      // A data de expiração vem do servidor, em ISO. Se a validação for antiga e
+      // não tiver o campo, a linha fica vazia em vez de dizer algo falso.
+      var textoExpira = document.getElementById('r-expira');
+
+      if (validacao.expires_at) {
+        var expira = new Date(validacao.expires_at);
+
+        textoExpira.textContent = Number.isNaN(expira.getTime())
+          ? ''
+          : 'Este link expira em ' + expira.toLocaleDateString('pt-BR', { timeZone: 'UTC' }) + '.';
+      } else {
+        textoExpira.textContent = '';
+      }
 
       resultado.hidden = false;
     } catch (erro) {
