@@ -963,6 +963,8 @@ test('GET /dashboard: 200 com HTML, formulário e botão de copiar', async () =>
     assert.match(corpo, /<input id="imagem" type="file" accept="image\/\*">/);
     assert.match(corpo, /readAsDataURL/);
     assert.match(corpo, /preview-imagem/);
+    assert.ok(corpo.includes('<button class="btn-primario" id="enviar" type="button">Validar ideia</button>'));
+    assert.ok(corpo.includes('<button class="btn-secundario" id="copiar" type="button">Copiar link do relatório</button>'));
     assert.match(corpo, /Validar ideia/);
 
     // Área de resultado com nota e veredito.
@@ -1022,6 +1024,8 @@ test('o HTML do relatório traz @page A4 e @media print escondendo os controles'
     assert.match(css, /@media print/);
     assert.match(css, /\.no-print/);
     assert.match(css, /button/);
+    assert.match(css, /color:\s*#000000 !important/);
+    assert.match(css, /background:\s*#ffffff !important/);
 
     // O relatório usa CSS externo local e não carrega JavaScript.
     assert.ok(!/<style/i.test(corpo), 'CSS não embutido no relatório');
@@ -1037,7 +1041,11 @@ test('GET /styles.css: 200 com content-type text/css', async () => {
     assert.equal(resposta.status, 200);
     assert.match(resposta.headers.get('content-type') || '', /text\/css/);
     assert.match(css, /--cor-azul:\s*#015875/);
+    assert.match(css, /--cor-fundo:\s*#1E1E1E/);
+    assert.match(css, /--cor-texto-principal:\s*#D4D4D8/);
     assert.match(css, /\.btn-primario/);
+    assert.match(css, /\.btn-primario\s*\{[^}]*color:\s*var\(--cor-preto\);[^}]*background:\s*var\(--cor-laranja\);/s);
+    assert.match(css, /\.banner\s*\{[^}]*background:\s*rgba\(244, 124, 25, 0\.1\);/s);
     assert.match(css, /\.card/);
     assert.match(css, /\.code-block/);
   });

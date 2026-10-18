@@ -62,6 +62,8 @@ real, e as rotas de escrita continuam sem autenticação, apesar do limite de ta
   verificadas independentemente nesta execução
 - fix-14: design system CSS reutilizável, tema escuro, tipografia neo-grotesca e impressão A4,
   aplicado ao dashboard e ao relatório
+- fix-15: refinamento visual clean/flat com fundo cinza escuro, texto suave, primário laranja e
+  vermelho/vinho reservados a alertas específicos
 
 ### Decisões do PO sobre acesso e apresentação
 
@@ -270,6 +272,8 @@ HTML A4. A descrição pode ser digitada ou extraída de uma imagem via OpenRout
 - **Design system do portfólio** em `public/styles.css`: paleta Schwartz Unleashed, tema escuro,
   hierarquia neo-grotesca e utilitários de botão, cartão, badge e código. Compartilhado pelo
   dashboard e relatório; preparado para reutilização nos próximos apps e com impressão A4 clara.
+  O acabamento fix-15 reduz a paleta em uso para cinzas e laranja; vermelho/vinho aparecem apenas
+  em estados específicos de perigo e alerta.
 - **Limite de taxa por IP nas rotas caras**, em `rate-limit.js`, sem dependência externa.
   `POST /validar-ideia` 10 por minuto, `POST /evidencias` 30, `GET /evidencias` sem filtro
   30, e 60 para relatório, nota e dashboard. A requisição barrada recebe `429` com

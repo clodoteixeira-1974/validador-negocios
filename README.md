@@ -219,9 +219,11 @@ São 123 testes automatizados, todos passando.
 ### Design system do portfólio
 
 `public/styles.css` contém um design system CSS puro, servido localmente em `/styles.css` e
-reutilizável pelos próximos apps do portfólio. O tema padrão é escuro e usa a paleta Schwartz
-Unleashed: preto `#000000`, azul petróleo `#015875`, vermelho `#FF0000`, vinho `#99164E` e
-laranja `#F47C19`, com texto suavizado `#F4F4F5` e cartões `#0D1117`.
+reutilizável pelos próximos apps do portfólio. O tema padrão é dark e clean: fundo `#1E1E1E`,
+texto `#D4D4D8`, superfície de cartão `#262626` e botões primários laranja `#F47C19`. Os tokens
+Schwartz Unleashed permanecem: preto `#000000`, azul petróleo `#015875`, vermelho `#FF0000`,
+vinho `#99164E` e laranja `#F47C19`. Na interface principal prevalecem cinzas e laranja;
+vermelho é reservado a erro/perigo e vinho a badges de alerta específicos.
 
 A tipografia segue o equilíbrio neo-grotesco: Plus Jakarta Sans ou Inter nos títulos, Inter no
 corpo e JetBrains Mono ou Fira Code para código. As fontes têm fallbacks de sistema e não são
