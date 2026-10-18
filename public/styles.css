@@ -1,16 +1,16 @@
 :root {
-  color-scheme: dark;
-  --cor-preto: #000000;
+  color-scheme: light;
+  --cor-preto: #141413;
   --cor-azul: #015875;
   --cor-vermelho: #FF0000;
   --cor-vinho: #99164E;
-  --cor-laranja: #F47C19;
-  --cor-texto-principal: #D4D4D8;
-  --cor-texto-secundario: #A1A1AA;
-  --cor-fundo: #1E1E1E;
-  --cor-fundo-card: #262626;
-  --cor-borda-suave: #3A3A3A;
-  --cor-sucesso: #63C58A;
+  --cor-laranja: #D97757;
+  --cor-texto-principal: #141413;
+  --cor-texto-secundario: #B0AEA5;
+  --cor-fundo: #FAF9F5;
+  --cor-fundo-card: #E8E6DC;
+  --cor-borda-suave: #D6D3CB;
+  --cor-sucesso: #3C7A57;
   --fonte-titulo: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   --fonte-corpo: 'Inter', system-ui, sans-serif;
   --fonte-mono: 'JetBrains Mono', 'Fira Code', monospace;
@@ -112,29 +112,29 @@ button:disabled {
 }
 
 .btn-primario {
-  color: var(--cor-preto);
+  color: var(--cor-fundo);
   background: var(--cor-laranja);
 }
 
 .btn-primario:hover {
-  color: var(--cor-preto);
-  background: #FF9B45;
+  color: var(--cor-fundo);
+  background: #C86A4B;
 }
 
 .btn-secundario {
   color: var(--cor-texto-principal);
   background: transparent;
-  border-color: #52525B;
+  border-color: #B0AEA5;
 }
 
 .btn-secundario:hover {
   color: var(--cor-texto-principal);
-  background: #383838;
-  border-color: #71717A;
+  background: #E8E6DC;
+  border-color: #8F8C82;
 }
 
 .btn-perigo {
-  color: #ffffff;
+  color: var(--cor-fundo);
   background: var(--cor-vermelho);
 }
 
@@ -144,7 +144,7 @@ button:disabled {
 
 .card {
   background: var(--cor-fundo-card);
-  border: 1px solid var(--cor-borda-suave);
+  border: 1px solid #DEDCD4;
   border-radius: 8px;
 }
 
@@ -160,13 +160,13 @@ button:disabled {
 }
 
 .badge-alerta {
-  color: #ffffff;
+  color: var(--cor-fundo);
   background: var(--cor-vinho);
 }
 
 .code-block {
   padding: 12px;
-  color: var(--cor-laranja);
+  color: var(--cor-texto-principal);
   background: var(--cor-fundo-card);
   border: 1px solid var(--cor-borda-suave);
   border-radius: 6px;
@@ -233,8 +233,8 @@ button:disabled {
 .veredito {
   margin: 14px 0 0;
   padding: 12px 14px;
-  background: #2B2B2B;
-  border-left: 3px solid #52525B;
+  background: #FAF9F5;
+  border-left: 3px solid #B0AEA5;
 }
 
 .veredito.decisao-PARAR {
@@ -279,7 +279,7 @@ td {
 
 th {
   color: var(--cor-texto-principal);
-  border-bottom-color: var(--cor-azul);
+  border-bottom-color: var(--cor-borda-suave);
   font-size: 8.5pt;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -337,8 +337,8 @@ td.pontos {
   margin: 0 0 22px;
   padding: 14px;
   color: var(--cor-texto-principal);
-  background: rgba(244, 124, 25, 0.1);
-  border: 1px solid rgba(244, 124, 25, 0.22);
+  background: rgba(217, 119, 87, 0.1);
+  border: 1px solid rgba(217, 119, 87, 0.22);
   border-radius: 6px;
 }
 
@@ -364,14 +364,14 @@ textarea {
   min-height: 110px;
   padding: 10px;
   color: var(--cor-texto-principal);
-  background: #292929;
+  background: #FAF9F5;
   border: 1px solid var(--cor-borda-suave);
   border-radius: 6px;
   font-size: 16px;
 }
 
 textarea::placeholder {
-  color: #A1A1AA;
+  color: #77756E;
 }
 
 .entrada-ideia {
@@ -423,8 +423,8 @@ textarea::placeholder {
   margin-top: 12px;
   padding: 10px 12px;
   color: var(--cor-sucesso);
-  background: rgba(99, 197, 138, 0.1);
-  border: 1px solid rgba(99, 197, 138, 0.25);
+  background: rgba(60, 122, 87, 0.1);
+  border: 1px solid rgba(60, 122, 87, 0.25);
   border-radius: 6px;
   font-size: 10pt;
   line-height: 1.4;
@@ -437,16 +437,16 @@ textarea::placeholder {
 }
 
 .aviso-erro {
-  color: #FFB4B4;
-  background: rgba(255, 0, 0, 0.1);
-  border-color: rgba(255, 0, 0, 0.32);
+  color: #7C173F;
+  background: rgba(153, 22, 78, 0.08);
+  border-color: rgba(153, 22, 78, 0.28);
 }
 
 .banner-suave {
   margin: 12px 0 0;
   padding: 10px 12px;
   color: var(--cor-texto-secundario);
-  background: #2A2A2A;
+  background: #E8E6DC;
   border: 1px solid var(--cor-borda-suave);
   border-radius: 6px;
   font-size: 9.5pt;
@@ -508,20 +508,32 @@ textarea::placeholder {
 @media print {
   :root {
     color-scheme: light;
-    --cor-texto-principal: #000000;
-    --cor-texto-secundario: #000000;
-    --cor-fundo: #ffffff;
-    --cor-fundo-card: #ffffff;
+    --cor-texto-principal: #141413;
+    --cor-texto-secundario: #5F5D56;
+    --cor-fundo: #FAF9F5;
+    --cor-fundo-card: #E8E6DC;
   }
 
-  body,
-  .folha,
-  .veredito,
+  body {
+    color: #141413 !important;
+    background: #FAF9F5 !important;
+  }
+
+  .folha {
+    color: #141413 !important;
+    background: #E8E6DC !important;
+  }
+
+  .veredito {
+    color: #141413 !important;
+    background: #FAF9F5 !important;
+  }
+
   table,
   th,
   td {
-    color: #000000 !important;
-    background: #ffffff !important;
+    color: #141413 !important;
+    background: transparent !important;
   }
 
   body {
@@ -562,22 +574,22 @@ textarea::placeholder {
   p,
   .meta,
   table {
-    color: #000000 !important;
+    color: #141413 !important;
     font-size: 10pt;
   }
 
   .nota-grande {
-    color: #000000 !important;
+    color: #141413 !important;
   }
 
   .pontos {
-    color: #000000 !important;
+    color: #141413 !important;
   }
 
   .disclaimer,
   .rodape,
   a {
-    color: #000000 !important;
+    color: #141413 !important;
   }
 
   a {

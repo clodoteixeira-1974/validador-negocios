@@ -1024,8 +1024,9 @@ test('o HTML do relatório traz @page A4 e @media print escondendo os controles'
     assert.match(css, /@media print/);
     assert.match(css, /\.no-print/);
     assert.match(css, /button/);
-    assert.match(css, /color:\s*#000000 !important/);
-    assert.match(css, /background:\s*#ffffff !important/);
+    assert.match(css, /color:\s*#141413 !important/);
+    assert.match(css, /background:\s*#FAF9F5 !important/);
+    assert.match(css, /background:\s*#E8E6DC !important/);
 
     // O relatório usa CSS externo local e não carrega JavaScript.
     assert.ok(!/<style/i.test(corpo), 'CSS não embutido no relatório');
@@ -1041,11 +1042,14 @@ test('GET /styles.css: 200 com content-type text/css', async () => {
     assert.equal(resposta.status, 200);
     assert.match(resposta.headers.get('content-type') || '', /text\/css/);
     assert.match(css, /--cor-azul:\s*#015875/);
-    assert.match(css, /--cor-fundo:\s*#1E1E1E/);
-    assert.match(css, /--cor-texto-principal:\s*#D4D4D8/);
+    assert.match(css, /--cor-fundo:\s*#FAF9F5/);
+    assert.match(css, /--cor-fundo-card:\s*#E8E6DC/);
+    assert.match(css, /--cor-texto-principal:\s*#141413/);
+    assert.match(css, /--cor-texto-secundario:\s*#B0AEA5/);
     assert.match(css, /\.btn-primario/);
-    assert.match(css, /\.btn-primario\s*\{[^}]*color:\s*var\(--cor-preto\);[^}]*background:\s*var\(--cor-laranja\);/s);
-    assert.match(css, /\.banner\s*\{[^}]*background:\s*rgba\(244, 124, 25, 0\.1\);/s);
+    assert.match(css, /--cor-laranja:\s*#D97757/);
+    assert.match(css, /\.btn-primario\s*\{[^}]*color:\s*var\(--cor-fundo\);[^}]*background:\s*var\(--cor-laranja\);/s);
+    assert.match(css, /\.banner\s*\{[^}]*background:\s*rgba\(217, 119, 87, 0\.1\);/s);
     assert.match(css, /\.card/);
     assert.match(css, /\.code-block/);
   });
