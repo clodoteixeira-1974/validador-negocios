@@ -102,6 +102,9 @@ function gerarHtmlRelatorio(validacao, nota, evidencias, base) {
   const blocoImagem = validacao.imagem_base64
     ? `<img class="imagem-validacao" src="${escapar(validacao.imagem_base64)}" alt="Imagem enviada com a ideia">`
     : '';
+  const blocoPdf = validacao.arquivo_base64
+    ? `<p class="pdf-validacao"><a href="${escapar(validacao.arquivo_base64)}" download="documento.pdf">Abrir PDF anexado</a></p>`
+    : '';
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -124,6 +127,7 @@ function gerarHtmlRelatorio(validacao, nota, evidencias, base) {
     <dt>Identificador</dt><dd>${escapar(validacao.id)}</dd>
   </dl>
   ${blocoImagem}
+  ${blocoPdf}
 
   <h2>Nota</h2>
   <p class="nota-grande">${escapar(nota.total)}</p>
@@ -177,17 +181,18 @@ function gerarHtmlDashboard() {
     </div>
 
     <div class="composer" role="group" aria-label="Nova ideia de negócio">
-      <label class="sr-only" for="ideia">Descreva sua ideia de negócio</label>
-      <textarea id="ideia" rows="2" placeholder="Descreva sua ideia de negócio..."></textarea>
-      <input id="imagem" type="file" accept="image/*">
+      <label class="sr-only" for="ideia">Descreva detalhadamente seu plano de negócios ou envie uma foto, imagem ou PDF do projeto</label>
+      <textarea id="ideia" rows="2" placeholder="Descreva detalhadamente seu plano de negócios ou envie uma foto, imagem ou PDF do projeto"></textarea>
+      <input id="imagem" type="file" accept="image/*,application/pdf" capture="environment">
       <img id="preview-imagem" class="preview-imagem" alt="Pré-visualização da imagem selecionada" hidden>
+      <p id="arquivo-selecionado" class="arquivo-selecionado" hidden></p>
       <div class="composer-controls">
         <div class="composer-left">
-          <label class="composer-attach" for="imagem" aria-label="Anexar imagem" title="Anexar imagem">+</label>
           <span class="composer-mode">Ideia</span>
         </div>
         <div class="composer-right">
           <span class="composer-meta">Régua determinística · 5 critérios</span>
+          <label class="composer-upload btn-secundario" for="imagem">Enviar imagem ou PDF</label>
           <button class="btn-primario composer-send" id="enviar" type="button" aria-label="Validar ideia" title="Validar ideia"><span aria-hidden="true">↑</span><span class="sr-only">Validar ideia</span></button>
         </div>
       </div>
@@ -231,8 +236,9 @@ function gerarHtmlDashboard() {
 <script>
 (function () {
   var campoIdeia = document.getElementById('ideia');
-  var campoImagem = document.getElementById('imagem');
+  var campoArquivo = document.getElementById('imagem');
   var previewImagem = document.getElementById('preview-imagem');
+  var arquivoSelecionado = document.getElementById('arquivo-selecionado');
   var botaoEnviar = document.getElementById('enviar');
   var botaoCopiar = document.getElementById('copiar');
   var aviso = document.getElementById('aviso');
@@ -268,47 +274,83 @@ function gerarHtmlDashboard() {
     return window.location.origin;
   }
 
-  function lerImagemComoDataUri(arquivo) {
+  function lerArquivoComoDataUri(arquivo) {
     return new Promise(function (resolve, reject) {
       var leitor = new FileReader();
-      leitor.onload = function () { resolve(leitor.result); };
-      leitor.onerror = function () { reject(new Error('Nao foi possivel ler a imagem.')); };
+      leitor.onload = function () {
+        var mimeType = /\.pdf$/i.test(arquivo.name) ? 'application/pdf' : arquivo.type;
+        var dataUri = leitor.result;
+
+        if (mimeType && typeof dataUri === 'string') {
+          dataUri = dataUri.replace(/^data:[^;]+;base64,/, 'data:' + mimeType + ';base64,');
+        }
+
+        resolve(dataUri);
+      };
+      leitor.onerror = function () { reject(new Error('Nao foi possivel ler o arquivo.')); };
       leitor.readAsDataURL(arquivo);
     });
   }
 
-  campoImagem.addEventListener('change', function () {
-    var arquivo = campoImagem.files && campoImagem.files[0];
+  campoArquivo.addEventListener('change', function () {
+    var arquivo = campoArquivo.files && campoArquivo.files[0];
 
     if (!arquivo) {
       previewImagem.removeAttribute('src');
       previewImagem.hidden = true;
+      arquivoSelecionado.textContent = '';
+      arquivoSelecionado.hidden = true;
       return;
     }
 
     if (arquivo.size > 10 * 1024 * 1024) {
-      campoImagem.value = '';
+      campoArquivo.value = '';
       previewImagem.removeAttribute('src');
       previewImagem.hidden = true;
-      mostrarAviso('A imagem deve ter no máximo 10 MB.');
+      arquivoSelecionado.textContent = '';
+      arquivoSelecionado.hidden = true;
+      mostrarAviso('O arquivo deve ter no máximo 10 MB.');
       return;
     }
 
-    lerImagemComoDataUri(arquivo).then(function (dataUri) {
+    var ehPdf = arquivo.type === 'application/pdf' || /\.pdf$/i.test(arquivo.name);
+
+    if (ehPdf) {
+      previewImagem.removeAttribute('src');
+      previewImagem.hidden = true;
+      arquivoSelecionado.textContent = 'PDF anexado: ' + arquivo.name;
+      arquivoSelecionado.hidden = false;
+      mostrarAviso('');
+      return;
+    }
+
+    if (!arquivo.type.startsWith('image/')) {
+      campoArquivo.value = '';
+      previewImagem.removeAttribute('src');
+      previewImagem.hidden = true;
+      arquivoSelecionado.textContent = '';
+      arquivoSelecionado.hidden = true;
+      mostrarAviso('Envie uma imagem ou um PDF.');
+      return;
+    }
+
+    arquivoSelecionado.textContent = '';
+    arquivoSelecionado.hidden = true;
+    lerArquivoComoDataUri(arquivo).then(function (dataUri) {
       previewImagem.src = dataUri;
       previewImagem.hidden = false;
       mostrarAviso('');
     }).catch(function () {
-      mostrarAviso('Nao foi possivel ler a imagem selecionada.');
+      mostrarAviso('Nao foi possivel ler o arquivo selecionado.');
     });
   });
 
   async function enviar() {
     var ideia = campoIdeia.value.trim();
-    var arquivoImagem = campoImagem.files && campoImagem.files[0];
+    var arquivo = campoArquivo.files && campoArquivo.files[0];
 
-    if (ideia === '' && !arquivoImagem) {
-      mostrarAviso('Escreva a ideia ou selecione uma imagem antes de validar.');
+    if (ideia === '' && !arquivo) {
+      mostrarAviso('Descreva sua ideia ou envie uma imagem ou PDF antes de validar.');
       return;
     }
 
@@ -322,8 +364,15 @@ function gerarHtmlDashboard() {
         dados.ideia = ideia;
       }
 
-      if (arquivoImagem) {
-        dados.imagem_base64 = await lerImagemComoDataUri(arquivoImagem);
+      if (arquivo) {
+        var arquivoBase64 = await lerArquivoComoDataUri(arquivo);
+        var ehPdf = arquivo.type === 'application/pdf' || /\.pdf$/i.test(arquivo.name);
+
+        if (ehPdf) {
+          dados.arquivo_base64 = arquivoBase64;
+        } else {
+          dados.imagem_base64 = arquivoBase64;
+        }
       }
 
       var respostaValidacao = await fetch('/validar-ideia', {

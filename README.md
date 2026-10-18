@@ -214,7 +214,7 @@ Para rodar os testes:
 npm test
 ```
 
-São 123 testes automatizados, todos passando.
+São 125 testes automatizados, todos passando.
 
 ### Design system do portfólio
 
@@ -224,8 +224,8 @@ reutilizável pelos próximos apps do portfólio. O tema padrão usa a paleta cl
 primário `#D97757` com texto branco. Vermelho e vinho ficam reservados a estados de erro, perigo
 e badges de alerta específicos.
 
-A tipografia segue o equilíbrio neo-grotesco: Plus Jakarta Sans ou Inter nos títulos, Inter no
-corpo e JetBrains Mono ou Fira Code para código. As fontes têm fallbacks de sistema e não são
+A tipografia segue o equilíbrio neo-grotesco: Plus Jakarta Sans no corpo, títulos com serifa
+elegante e JetBrains Mono ou Fira Code para código. As fontes têm fallbacks de sistema e não são
 baixadas de serviços externos.
 
 As classes utilitárias `.btn-primario`, `.btn-secundario`, `.btn-perigo`, `.card`, `.badge` e
@@ -240,10 +240,12 @@ do portfólio.
 
 ### Envio de imagem e OpenRouter
 
-O dashboard aceita um arquivo `image/*` ou uma descrição digitada. A pré-visualização é
-mostrada antes do envio. Imagens devem ter no máximo 10 MB após decodificação; o servidor
-converte a imagem em descrição com a API OpenRouter, sem usar o modelo para classificar a
-ideia ou calcular a nota.
+O dashboard aceita imagem ou PDF, além da descrição digitada. O botão “Enviar imagem ou PDF”
+abre o seletor de arquivos; em dispositivos compatíveis, `capture="environment"` oferece a
+câmera traseira para captura de imagem. Imagens mostram pré-visualização; PDFs mostram o nome do
+arquivo selecionado. Cada arquivo pode ter no máximo 10 MB após decodificação. O servidor envia
+imagens ao OpenRouter como `image_url` e PDFs como item `file`; o texto extraído alimenta a
+validação, sem delegar classificação ou nota ao modelo.
 
 Configure `OPENROUTER_API_KEY` no ambiente antes de iniciar o servidor. O arquivo
 `.env.example` documenta as variáveis, mas o projeto não carrega `.env` automaticamente.
@@ -442,7 +444,7 @@ Fase avançada: o serviço de validação e classificação está funcionando, a
 completa com os cinco critérios, cada nota vem com um veredito, e a nota é **por ideia**:
 as evidências se vinculam ao identificador da validação, e o relatório mostra a nota
 correta daquela ideia. Há um dashboard em HTML que gera um relatório A4 com link para
-compartilhar. São 123 testes automatizados, todos passando.
+compartilhar. São 125 testes automatizados, todos passando.
 
 O serviço é **público e de portfólio**, com isso avisado na própria interface: banner no
 dashboard, aviso de que os dados são de demonstração, aviso de que a qualidade da nota

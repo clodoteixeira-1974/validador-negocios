@@ -70,6 +70,8 @@ real, e as rotas de escrita continuam sem autenticação, apesar do limite de ta
   nativo residual e lista de tecnologias/competências no rodapé do dashboard
 - fix-18: dashboard reorganizado em layout de compositor fluido inspirado na referência Claude,
   com título central, upload por ícone e envio por seta
+- fix-19: upload aceita imagem ou PDF, solicita captura pela câmera em dispositivos compatíveis
+  e envia documentos ao OpenRouter para extração de texto
 
 ### Decisões do PO sobre acesso e apresentação
 
@@ -101,7 +103,8 @@ só, e nenhum placeholder chegou ao HTML.
 - [Baixa] Link do perfil do autor no rodapé: hoje aponta para o perfil no GitHub, e não para
   um site pessoal
 - [Baixa] Migração das validações antigas para `expires_at`. Hoje elas não expiram
-- [Baixa] RAG e outras análises de mercado com LLM; o uso atual do OpenRouter limita-se à extração de texto de imagem
+- [Baixa] RAG e outras análises de mercado com LLM; o OpenRouter extrai texto de imagens e PDFs,
+  mas não faz análise de mercado
 - [Baixa] Relatório que compare mais de uma validação
 - [Baixa] Backup dos dados de execução e `.env`
 - [Baixa] Classificação de tipo ainda é por palavra-chave. O limite de palavra corrigiu o falso
@@ -253,7 +256,7 @@ HTML A4. A descrição pode ser digitada ou extraída de uma imagem via OpenRout
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 123 testes automatizados (81 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
+- 125 testes automatizados (83 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
   `nota.test.js`)
 - **Leitura de `.jsonl` resiliente e unificada**: `validacoes.jsonl` e `evidencias.jsonl` são
   lidos pela mesma função, em `jsonl.js`. Linha corrompida é ignorada com aviso em
@@ -292,11 +295,10 @@ HTML A4. A descrição pode ser digitada ou extraída de uma imagem via OpenRout
   no mesmo balde. `X-Forwarded-For` é ignorado de propósito, para não ser burlado- **Aviso no relatório** de que as evidências vêm de usuários e não há verificação de fonte
   automática, seguido da data de expiração do link
 - **Página de link expirado** em HTML simples, sem o CSS pesado do relatório
-- **Upload de imagem opcional** no dashboard: data URI limitada a 10 MB após decodificação,
-  pré-visualizada no navegador e armazenada com a validação. `OPENROUTER_API_KEY` é lida do
-  ambiente; o modelo de visão padrão em `OPENROUTER_MODEL` é `openai/gpt-5.6-luna`, podendo
-  ser substituído pela variável de ambiente. O formato `image_url` foi validado em chamada real
-  com PNG; o erro encapsulado do provedor agora apresenta sua causa legível quando disponível.
+- **Upload opcional de imagem ou PDF** no dashboard: arquivos de até 10 MB são enviados ao
+  OpenRouter para extração de texto; imagens aparecem em pré-visualização e PDFs ficam com link
+  no relatório. Em dispositivos compatíveis, o input solicita captura pela câmera traseira.
+  `OPENROUTER_MODEL` usa `openai/gpt-5.6-luna` por padrão; PDFs usam conteúdo multimodal `file`.
 
 ## O que não existe ainda
 
@@ -305,7 +307,7 @@ Alinhado ao fluxograma do projeto:
 - Coleta real de concorrentes
 - Extração de reclamações
 - Vínculo automático entre uma ideia e suas evidências na hora de coletar
-- RAG e análises de mercado com LLM (o OpenRouter atual é usado somente para extração de texto de imagem)
+- RAG e análises de mercado com LLM (OpenRouter é usado apenas para extração de texto de imagem/PDF)
 - Frontend além do dashboard HTML atual
 - Deploy
 - **Autenticação ou revogação de link**, que a decisão do PO adiou para depois da validade
@@ -363,7 +365,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-  npm test        # roda os 123 testes automatizados
+  npm test        # roda os 125 testes automatizados
 ```
 
 Exemplos de chamada:

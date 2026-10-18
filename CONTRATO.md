@@ -25,28 +25,31 @@ Gravada em `validacoes.jsonl`. É a unidade que o relatório consegue reabrir pe
 | Campo | Tipo | Obrigatório | Onde é gerado | Onde é consumido |
 | --- | --- | --- | --- | --- |
 | `id` | string | sim | servidor, `gerarId()` | resposta de `POST /validar-ideia`; chave de `GET /relatorio/:id`; valor de `id_validacao` numa evidência; filtro `?id=` |
-| `ideia` | string | sim | cliente, ou OpenRouter quando a descrição é extraída de imagem | classificação; relatório (bloco "A ideia") |
+| `ideia` | string | sim | cliente, ou OpenRouter quando a descrição é extraída de imagem/PDF | classificação; relatório (bloco "A ideia") |
 | `imagem_base64` | string (data URI) | não | cliente, `FileReader` no dashboard | extração da descrição via OpenRouter; relatório |
+| `arquivo_base64` | string (data URI PDF) | não | cliente, `FileReader` no dashboard | extração da descrição via OpenRouter; link para abrir o PDF no relatório |
 | `tipo` | string | sim | servidor, `classificarTipo()` | resposta; relatório |
 | `timestamp` | string ISO 8601 | sim | servidor, `new Date().toISOString()` | relatório, formatado em pt-BR |
 | `expires_at` | string ISO 8601 | sim | servidor, `gerarExpiracao()` | verificação de `GET /relatorio/:id`; resposta; rodapé do relatório |
 
-`imagem_base64`, quando enviada, deve começar com `data:image/` e conter a imagem em
-Base64. O tamanho máximo do conteúdo **após decodificação** é 10 MB. O servidor envia a
-imagem ao OpenRouter apenas para extrair a descrição textual da ideia; essa descrição passa
-a ser o valor de `ideia` usado na classificação e nas demais etapas. Sem imagem, a validação
-continua usando o campo `ideia` enviado pelo cliente.
+`imagem_base64`, quando enviada, deve começar com `data:image/` e conter uma imagem Base64. O
+PDF usa `arquivo_base64`, com data URI `data:application/pdf;base64,` e assinatura `%PDF-`. Cada
+arquivo pode ter até 10 MB após decodificação. Imagens são enviadas ao OpenRouter como `image_url`
+e PDFs como item multimodal `file`; o texto extraído alimenta `ideia`. Sem anexo, a validação usa
+o campo `ideia` do cliente. O relatório inclui a imagem ou um link para abrir o PDF. Em navegadores
+compatíveis, `capture="environment"` oferece a câmera traseira.
 
-O modelo visual é configurado pela variável de ambiente `OPENROUTER_MODEL`. O padrão é
-`openai/gpt-5.6-luna`; outro modelo pode ser informado nessa variável. O modelo é usado apenas
-para extrair a descrição da imagem, não para classificar a ideia nem calcular a nota. O servidor
+O modelo de visão/documentos é configurado pela variável de ambiente `OPENROUTER_MODEL`. O padrão
+é `openai/gpt-5.6-luna`; outro modelo pode ser informado nessa variável. O modelo é usado apenas
+para extrair a descrição do anexo, não para classificar a ideia nem calcular a nota. O servidor
 lê `OPENROUTER_API_KEY` e `OPENROUTER_MODEL` do ambiente e não carrega um arquivo `.env`
 automaticamente.
 
-A requisição multimodal usa o formato Chat Completions: uma mensagem com conteúdo em lista,
-contendo texto e `image_url` com a data URI da imagem. Esse formato foi validado em chamada
-real ao OpenRouter com uma imagem PNG contendo texto; o Luna aceitou a imagem e retornou a
-transcrição. Se o OpenRouter responder `Provider returned error` e incluir uma mensagem JSON em
+A requisição multimodal usa o formato Chat Completions: a lista de conteúdo contém texto e,
+conforme o anexo, `image_url` para imagem ou `file` para PDF. O formato `image_url` foi validado
+em chamada real ao OpenRouter com uma imagem PNG contendo texto; o formato de PDF é coberto por
+testes automatizados com resposta simulada. Se o OpenRouter responder `Provider returned error`
+e incluir uma mensagem JSON em
 `error.metadata.raw`, o servidor repassa a mensagem interna do provedor na resposta de erro,
 em vez de ocultá-la atrás do erro genérico.
 

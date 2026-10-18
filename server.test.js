@@ -194,6 +194,59 @@ test('imagem valida: extrai a descricao pelo OpenRouter e grava imagem_base64', 
   });
 });
 
+test('PDF valido: extrai texto pelo OpenRouter, grava o PDF e inclui link no relatorio', async () => {
+  const pdf = 'data:application/pdf;base64,JVBERi0xLjQK';
+  let chamada;
+
+  await comServidor(async ({ base, arquivo }) => {
+    const validacao = await post(base, { arquivo_base64: pdf });
+
+    assert.equal(validacao.status, 200);
+    assert.equal(validacao.corpo.ideia, 'Plano de negócio extraído do PDF');
+    assert.equal(chamada.url, 'https://openrouter.ai/api/v1/chat/completions');
+
+    const pedido = JSON.parse(chamada.opcoes.body);
+    assert.equal(pedido.model, 'modelo-de-teste');
+    assert.deepEqual(pedido.messages[0].content, [
+      {
+        type: 'text',
+        text: 'Extraia a descricao da ideia de negocio contida neste PDF. Responda apenas com a descricao em texto, sem introducoes.'
+      },
+      { type: 'file', file: { filename: 'documento.pdf', file_data: pdf } }
+    ]);
+
+    const registro = JSON.parse(lerLinhas(arquivo)[0]);
+    assert.equal(registro.arquivo_base64, pdf);
+
+    const relatorio = await fetch(`${base}/relatorio/${validacao.corpo.id}`);
+    const html = await relatorio.text();
+    assert.equal(relatorio.status, 200);
+    assert.ok(html.includes(`href="${pdf}" download="documento.pdf"`));
+    assert.match(html, /Abrir PDF anexado/);
+  }, {
+    openRouterApiKey: 'chave-de-teste',
+    openRouterModel: 'modelo-de-teste',
+    fetchOpenRouter: async (url, opcoes) => {
+      chamada = { url, opcoes };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: 'Plano de negócio extraído do PDF' } }] })
+      };
+    }
+  });
+});
+
+test('PDF com conteúdo inválido: 400 sem gravar validação', async () => {
+  await comServidor(async ({ base, arquivo }) => {
+    const resposta = await post(base, { arquivo_base64: 'data:application/pdf;base64,aGVsbG8=' });
+
+    assert.equal(resposta.status, 400);
+    assert.match(resposta.corpo.error, /^PDF invalido:/);
+    assert.equal(lerLinhas(arquivo).length, 0);
+  });
+});
+
 test('imagem_base64 com formato errado: 400 e nada gravado', async () => {
   await comServidor(async ({ base, arquivo }) => {
     const r = await post(base, { ideia: 'Ignorada', imagem_base64: 'texto sem data URI' });
@@ -961,12 +1014,12 @@ test('GET /dashboard: 200 com HTML, formulário e botão de copiar', async () =>
     // Formulário para enviar a ideia.
     assert.match(corpo, /<textarea/);
     assert.match(corpo, /id="ideia"/);
-    assert.match(corpo, /<input id="imagem" type="file" accept="image\/\*">/);
-    assert.ok(corpo.includes('<label class="composer-attach" for="imagem" aria-label="Anexar imagem" title="Anexar imagem">+</label>'));
+    assert.match(corpo, /<input id="imagem" type="file" accept="image\/\*,application\/pdf" capture="environment">/);
+    assert.ok(corpo.includes('<label class="composer-upload btn-secundario" for="imagem">Enviar imagem ou PDF</label>'));
     assert.ok(corpo.includes('class="composer"'));
-    assert.ok(corpo.includes('Escolher arquivo') === false);
     assert.ok(!corpo.includes('Nenhum arquivo selecionado'));
     assert.ok(!corpo.includes('No file chosen'));
+    assert.match(corpo, /Descreva detalhadamente seu plano de negócios ou envie uma foto, imagem ou PDF do projeto/);
     assert.match(corpo, /readAsDataURL/);
     assert.match(corpo, /preview-imagem/);
     assert.ok(corpo.includes('<button class="btn-primario composer-send" id="enviar" type="button" aria-label="Validar ideia" title="Validar ideia"><span aria-hidden="true">↑</span><span class="sr-only">Validar ideia</span></button>'));
@@ -1062,7 +1115,7 @@ test('GET /styles.css: 200 com content-type text/css', async () => {
     assert.match(css, /\.composer\s*\{[^}]*background:\s*#FFFFFF;[^}]*border-radius:\s*16px/s);
     assert.match(css, /\.composer\s*\{[^}]*box-shadow:\s*0 4px 14px rgba\(20, 20, 19, 0\.07\)/s);
     assert.match(css, /\.composer input\[type="file"\]\s*\{[^}]*clip-path:\s*inset\(50%\)/s);
-    assert.match(css, /\.composer input\[type="file"\]:focus-visible ~ \.composer-controls \.composer-attach/);
+    assert.match(css, /\.composer input\[type="file"\]:focus-visible ~ \.composer-controls \.composer-upload/);
     assert.match(css, /\.vitrine \.vitrine-skills/);
     assert.match(css, /\.card/);
     assert.match(css, /\.code-block/);
