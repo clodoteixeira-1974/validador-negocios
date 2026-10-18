@@ -72,42 +72,61 @@ function validarIdeia(corpo) {
   return { ok: true, ideia };
 }
 
-// Valida o data URI e mede os bytes da imagem decodificada, não o tamanho do
-// texto Base64 que atravessa o JSON.
-function validarImagemBase64(imagem) {
-  if (typeof imagem !== 'string') {
+// Valida data URI de imagem ou PDF e mede os bytes decodificados, não o tamanho
+// do Base64 que atravessa o JSON.
+function validarArquivoBase64(arquivo) {
+  if (typeof arquivo !== 'string') {
     return { ok: false, erro: 'deve ser uma string' };
   }
 
-  if (!imagem.startsWith('data:image/')) {
-    return { ok: false, erro: 'deve comecar com data:image/' };
+  if (!arquivo.startsWith('data:image/') && !arquivo.startsWith('data:application/pdf')) {
+    return { ok: false, erro: 'deve ser uma imagem ou PDF em Base64' };
   }
 
-  const correspondencia = /^data:image\/[a-z0-9.+-]+;base64,([a-z0-9+/]*={0,2})$/i.exec(imagem);
+  const correspondencia = /^data:(image\/[a-z0-9.+-]+|application\/pdf);base64,([a-z0-9+/]*={0,2})$/i.exec(arquivo);
 
-  if (!correspondencia || correspondencia[1] === '') {
-    return { ok: false, erro: 'data URI deve conter imagem em Base64 valida' };
+  if (!correspondencia || correspondencia[2] === '') {
+    return { ok: false, erro: 'data URI deve conter imagem ou PDF em Base64 valido' };
   }
 
-  const conteudoBase64 = correspondencia[1];
+  const mimeType = correspondencia[1].toLowerCase();
+  const conteudoBase64 = correspondencia[2];
   const bytes = Buffer.from(conteudoBase64, 'base64');
   const base64Canonico = bytes.toString('base64').replace(/=+$/, '');
 
   if (base64Canonico !== conteudoBase64.replace(/=+$/, '')) {
-    return { ok: false, erro: 'data URI deve conter imagem em Base64 valida' };
+    return { ok: false, erro: 'data URI deve conter imagem ou PDF em Base64 valido' };
   }
 
   if (bytes.length > LIMITE_IMAGEM_BYTES) {
-    return { ok: false, erro: 'o tamanho maximo da imagem e 10 MB' };
+    return { ok: false, erro: 'o tamanho maximo do arquivo e 10 MB' };
   }
 
-  return { ok: true };
+  if (mimeType === 'application/pdf' && bytes.subarray(0, 5).toString('ascii') !== '%PDF-') {
+    return { ok: false, erro: 'o conteudo nao e um PDF valido' };
+  }
+
+  return { ok: true, mimeType };
 }
 
-async function extrairDescricaoImagem(imagem, fetchOpenRouter, apiKey, model) {
+async function extrairDescricaoArquivo(arquivo, mimeType, fetchOpenRouter, apiKey, model) {
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY nao configurada');
   }
+
+  const ehPdf = mimeType === 'application/pdf';
+  const anexo = ehPdf
+    ? {
+      type: 'file',
+      file: {
+        filename: 'documento.pdf',
+        file_data: arquivo
+      }
+    }
+    : {
+      type: 'image_url',
+      image_url: { url: arquivo }
+    };
 
   const resposta = await fetchOpenRouter('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -122,12 +141,11 @@ async function extrairDescricaoImagem(imagem, fetchOpenRouter, apiKey, model) {
         content: [
           {
             type: 'text',
-            text: 'Extraia a descricao da ideia de negocio contida nesta imagem. Responda apenas com a descricao em texto, sem introducoes.'
+            text: ehPdf
+              ? 'Extraia a descricao da ideia de negocio contida neste PDF. Responda apenas com a descricao em texto, sem introducoes.'
+              : 'Extraia a descricao da ideia de negocio contida nesta imagem. Responda apenas com a descricao em texto, sem introducoes.'
           },
-          {
-            type: 'image_url',
-            image_url: { url: imagem }
-          }
+          anexo
         ]
       }]
     })
@@ -309,24 +327,32 @@ function linkExpirado(validacao, agora = Date.now()) {
     const corpo = req.body;
     const temImagem = corpo && typeof corpo === 'object'
       && Object.prototype.hasOwnProperty.call(corpo, 'imagem_base64');
+    const temPdf = corpo && typeof corpo === 'object'
+      && Object.prototype.hasOwnProperty.call(corpo, 'arquivo_base64');
+    const temArquivo = temImagem || temPdf;
     let ideia;
+    let arquivoValidado;
 
-    if (temImagem) {
-      const validacaoImagem = validarImagemBase64(corpo.imagem_base64);
+    if (temArquivo) {
+      const conteudoArquivo = temPdf ? corpo.arquivo_base64 : corpo.imagem_base64;
+      arquivoValidado = validarArquivoBase64(conteudoArquivo);
 
-      if (!validacaoImagem.ok) {
-        return res.status(400).json({ error: `Imagem invalida: ${validacaoImagem.erro}` });
+      if (!arquivoValidado.ok) {
+        const erroTipoArquivo = temPdf ? 'PDF invalido' : 'Imagem invalida';
+        return res.status(400).json({ error: `${erroTipoArquivo}: ${arquivoValidado.erro}` });
       }
 
       try {
-        ideia = await extrairDescricaoImagem(
-          corpo.imagem_base64,
+        ideia = await extrairDescricaoArquivo(
+          conteudoArquivo,
+          arquivoValidado.mimeType,
           fetchOpenRouter,
           openRouterApiKey,
           openRouterModel
         );
       } catch (erro) {
-        return res.status(400).json({ error: `Falha ao processar imagem: ${erro.message}` });
+        const tipoArquivo = temPdf ? 'PDF' : 'imagem';
+        return res.status(400).json({ error: `Falha ao processar ${tipoArquivo}: ${erro.message}` });
       }
     } else {
       const resultado = validarIdeia(corpo);
@@ -344,7 +370,8 @@ function linkExpirado(validacao, agora = Date.now()) {
       tipo: classificarTipo(ideia),
       timestamp: new Date().toISOString(),
       expires_at: gerarExpiracao(),
-      ...(temImagem ? { imagem_base64: corpo.imagem_base64 } : {})
+      ...(temImagem ? { imagem_base64: corpo.imagem_base64 } : {}),
+      ...(temPdf ? { arquivo_base64: corpo.arquivo_base64 } : {})
     };
 
     registrarValidacao(registro, arquivoValidacoes);
