@@ -4,10 +4,9 @@
 //   - o relatório de uma validação, feito para ser lido e impresso em A4;
 //   - o dashboard, onde se envia uma ideia e se acompanha o resultado.
 //
-// Nenhuma das duas depende de fonte externa, framework ou biblioteca: o CSS é
-// embutido no próprio HTML e a única concessionária é a API, à qual a página
-// fala por fetch. Isso mantém o projeto com a única dependência que tem
-// (express), sem abrir mão de um documento imprimível.
+// Nenhuma das duas depende de framework ou biblioteca visual: ambas carregam a
+// folha CSS compartilhada servida localmente. A única dependência continua sendo
+// express, e o relatório permanece imprimível em A4.
 
 // Identidade do projeto, usada nos rodapés do dashboard e do relatório.
 // Ficam aqui, e não repetidas no HTML, para que trocar o nome do autor seja uma
@@ -15,386 +14,6 @@
 const AUTOR_PROJETO = 'Clodoaldo Teixeira';
 const PERFIL_AUTOR = 'https://github.com/clodoteixeira-1974';
 const REPOSITORIO = 'https://github.com/clodoteixeira-1974/validador-negocios';
-
-const CSS = `
-* { box-sizing: border-box; }
-
-body {
-  margin: 0;
-  padding: 24px;
-  font-family: Georgia, "Times New Roman", serif;
-  color: #1a1a1a;
-  background: #f4f4f2;
-  line-height: 1.5;
-}
-
-.folha {
-  max-width: 210mm;
-  margin: 0 auto;
-  padding: 20mm 18mm;
-  background: #ffffff;
-  border: 1px solid #d8d8d4;
-}
-
-h1 {
-  margin: 0 0 4px;
-  font-size: 22pt;
-  letter-spacing: -0.3px;
-}
-
-h2 {
-  margin: 26px 0 8px;
-  font-size: 12pt;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: #555555;
-  border-bottom: 1px solid #e2e2de;
-  padding-bottom: 4px;
-}
-
-.subtitulo {
-  margin: 0 0 22px;
-  font-size: 10pt;
-  color: #777770;
-}
-
-.meta {
-  font-size: 10pt;
-  color: #444440;
-}
-
-.meta dt {
-  display: inline-block;
-  min-width: 34mm;
-  font-weight: bold;
-  color: #666660;
-}
-
-.meta dd {
-  display: inline-block;
-  margin: 0 0 4px;
-}
-
-.nota-grande {
-  font-size: 34pt;
-  line-height: 1;
-  font-weight: bold;
-}
-
-.nota-max {
-  font-size: 14pt;
-  color: #777770;
-}
-
-.veredito {
-  margin: 14px 0 0;
-  padding: 12px 14px;
-  border-left: 4px solid #999990;
-  background: #f7f7f4;
-}
-
-.veredito.decisao-PARAR { border-left-color: #a33a3a; }
-.veredito.decisao-MUDAR_O_RECORTE { border-left-color: #b0801f; }
-.veredito.decisao-SEGUIR { border-left-color: #3d7a4e; }
-
-.decisao {
-  font-size: 15pt;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-}
-
-.explicacao {
-  font-size: 10.5pt;
-  color: #444440;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 9.5pt;
-}
-
-th, td {
-  text-align: left;
-  padding: 6px 8px;
-  border-bottom: 1px solid #ecece8;
-  vertical-align: top;
-}
-
-th {
-  font-size: 8.5pt;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: #777770;
-  border-bottom: 1px solid #d8d8d4;
-}
-
-td.pontos {
-  width: 14mm;
-  font-weight: bold;
-}
-
-.vazio {
-  font-size: 10pt;
-  color: #888880;
-  font-style: italic;
-}
-
-.rodape {
-  margin-top: 30px;
-  padding-top: 10px;
-  border-top: 1px solid #e2e2de;
-  font-size: 8.5pt;
-  color: #888880;
-}
-
-.rodape a {
-  color: #555550;
-}
-
-/* Dashboard */
-
-.painel {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 28px;
-  background: #ffffff;
-  border: 1px solid #d8d8d4;
-}
-
-label {
-  display: block;
-  margin: 0 0 6px;
-  font-size: 11pt;
-  font-weight: bold;
-  color: #444440;
-}
-
-textarea {
-  width: 100%;
-  min-height: 110px;
-  padding: 10px;
-  font-family: inherit;
-  font-size: 11pt;
-  border: 1px solid #c8c8c2;
-  background: #fdfdfb;
-}
-
-.entrada-ideia {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.45fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.campo-imagem {
-  min-width: 0;
-}
-
-.campo-imagem input {
-  max-width: 100%;
-}
-
-.preview-imagem {
-  display: block;
-  max-width: 100%;
-  max-height: 220px;
-  margin-top: 10px;
-  page-break-inside: avoid;
-}
-
-.preview-imagem[hidden] {
-  display: none;
-}
-
-.imagem-validacao {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  margin: 12px 0 20px;
-  page-break-inside: avoid;
-  break-inside: avoid;
-}
-
-@media (max-width: 640px) {
-  .entrada-ideia {
-    grid-template-columns: 1fr;
-  }
-}
-
-button {
-  margin-top: 10px;
-  padding: 9px 18px;
-  font-family: inherit;
-  font-size: 11pt;
-  cursor: pointer;
-  border: 1px solid #8a8a82;
-  background: #f0f0ec;
-}
-
-button:hover { background: #e6e6e0; }
-
-button:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
-.resultado {
-  margin-top: 22px;
-  padding-top: 18px;
-  border-top: 1px solid #e2e2de;
-}
-
-.link-caixa {
-  margin-top: 12px;
-  padding: 10px;
-  font-family: "Courier New", monospace;
-  font-size: 10pt;
-  word-break: break-all;
-  background: #f4f4f2;
-  border: 1px solid #e2e2de;
-}
-
-.aviso {
-  margin-top: 12px;
-  padding: 10px 12px;
-  font-size: 10pt;
-  line-height: 1.4;
-  color: #245c33;
-  background: #eef6f0;
-  border: 1px solid #cfe3d4;
-  border-radius: 4px;
-  opacity: 1;
-  transition: opacity 0.2s ease-in-out;
-}
-
-/* While it is being shown or hidden. Starts hidden, without taking space. */
-.aviso.oculto {
-  display: none;
-}
-
-/* Errors keep the red tone. */
-.aviso-erro {
-  color: #a33a3a;
-  background: #fbf0f0;
-  border-color: #eed6d6;
-}
-
-/* Aviso de portfólio, no topo do dashboard. Forte o bastante para ser lido
-   antes de qualquer campo, e escondido na impressão: quem imprime quer o
-   relatório, não o banner. */
-.banner {
-  margin: 0 0 22px;
-  padding: 12px 14px;
-  font-size: 10pt;
-  line-height: 1.5;
-  color: #4a4326;
-  background: #fbf7e8;
-  border: 1px solid #e6dcb4;
-  border-radius: 4px;
-}
-
-.banner strong {
-  display: block;
-  margin-bottom: 4px;
-}
-
-.banner p {
-  margin: 4px 0 0;
-}
-
-/* Aviso menor, de qualidade de evidência. */
-.banner-suave {
-  margin: 12px 0 0;
-  padding: 10px 12px;
-  font-size: 9.5pt;
-  line-height: 1.5;
-  color: #555550;
-  background: #f7f7f4;
-  border: 1px solid #e2e2de;
-  border-radius: 4px;
-}
-
-/* Rodapé do relatório: o aviso sobre verificação de fonte. */
-.disclaimer {
-  margin: 10px 0 0;
-  font-size: 9pt;
-  line-height: 1.5;
-  color: #777770;
-}
-
-/* Vitrine de portfólio no rodapé do dashboard. */
-.vitrine {
-  margin-top: 26px;
-  padding-top: 14px;
-  font-size: 9.5pt;
-  color: #555550;
-  border-top: 1px solid #d8d8d4;
-}
-
-.vitrine p {
-  margin: 0 0 8px;
-}
-
-.vitrine-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-/* Botão do rodapé: mesmo desenho do botão principal, sem o margin-top. */
-.botao-secundario {
-  display: inline-block;
-  padding: 8px 16px;
-  font-family: inherit;
-  font-size: 10pt;
-  color: #1a1a1a;
-  text-decoration: none;
-  border: 1px solid #8a8a82;
-  background: #f0f0ec;
-}
-
-.botao-secundario:hover {
-  background: #e6e6e0;
-}
-
-/* Impressão: folha A4 limpa, sem controles. */
-
-@page {
-  size: A4;
-  margin: 2cm;
-}
-
-@media print {
-  body {
-    padding: 0;
-    background: #ffffff;
-  }
-
-  .folha {
-    max-width: none;
-    margin: 0;
-    padding: 0;
-    border: none;
-  }
-
-  .painel, .link-caixa, button, .aviso {
-    display: none;
-  }
-
-  /* O disclaimer do relatório continua na impressão: ele é o aviso que
-     acompanha o papel quando o documento sai do site. O banner e a vitrine do
-     dashboard somem junto com o .painel, que já não é impresso. */
-  .disclaimer { color: #1a1a1a; }
-
-  .relatorio { display: block !important; }
-
-  a {
-    color: #1a1a1a;
-    text-decoration: none;
-  }
-}
-`;
 
 // Escapa o que vier de dentro para o HTML. Os dados são texto do usuário e não
 // podem ser interpretados como marcação.
@@ -434,7 +53,7 @@ function gerarRodape(base, validacao) {
     <div class="rodape">
       Gerado em ${escapar(agora)} (UTC) &middot;
       ${expiracao} &middot;
-      <a href="${escapar(base)}/dashboard">abrir o dashboard</a>
+      <a class="no-print" href="${escapar(base)}/dashboard">abrir o dashboard</a>
     </div>
     <p class="disclaimer">
       Este relatório é gerado a partir de evidências fornecidas por usuários.
@@ -490,10 +109,10 @@ function gerarHtmlRelatorio(validacao, nota, evidencias, base) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Relatório — Validador de Novos Negócios</title>
-<style>${CSS}</style>
+<link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<main class="folha">
+<main class="folha card relatorio">
   <h1>Validador de Novos Negócios</h1>
   <p class="subtitulo">Relatório de validação de ideia</p>
 
@@ -539,12 +158,12 @@ function gerarHtmlDashboard() {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Validador de Novos Negócios</title>
-<style>${CSS}</style>
+<link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<main class="painel">
+<main class="painel card">
   <div class="banner">
-    <strong>Este é um projeto de portfólio.</strong>
+    <strong class="badge">Este é um projeto de portfólio.</strong>
     <p>Os dados são fictícios ou de demonstração. Não use para decisões de negócio
     reais.</p>
   </div>
@@ -563,7 +182,7 @@ function gerarHtmlDashboard() {
       <img id="preview-imagem" class="preview-imagem" alt="Pré-visualização da imagem selecionada" hidden>
     </div>
   </div>
-  <button id="enviar" type="button">Validar ideia</button>
+  <button class="btn-primario" id="enviar" type="button">Validar ideia</button>
 
   <p class="banner-suave">As evidências são fornecidas por usuários. A qualidade da nota
   depende da qualidade das evidências.</p>
@@ -581,9 +200,9 @@ function gerarHtmlDashboard() {
     </dl>
 
     <h2>Link do relatório</h2>
-    <p class="link-caixa" id="r-link"></p>
+    <p class="link-caixa code-block" id="r-link"></p>
     <p class="banner-suave" id="r-expira"></p>
-    <button id="copiar" type="button">Copiar link do relatório</button>
+    <button class="btn-secundario" id="copiar" type="button">Copiar link do relatório</button>
     <div id="aviso-copia" class="aviso oculto" role="status" aria-live="polite">Link copiado!</div>
   </div>
 
@@ -591,7 +210,7 @@ function gerarHtmlDashboard() {
     <p>Projeto de portfólio. Desenvolvido por
       <a href="${escapar(PERFIL_AUTOR)}">${escapar(AUTOR_PROJETO)}</a>.</p>
     <div class="vitrine-links">
-      <a class="botao-secundario" href="${escapar(REPOSITORIO)}" rel="noopener">Ver código-fonte</a>
+      <a class="botao-secundario btn-secundario" href="${escapar(REPOSITORIO)}" rel="noopener">Ver código-fonte</a>
     </div>
   </div>
 </main>
@@ -764,7 +383,6 @@ function gerarHtmlDashboard() {
 module.exports = {
   gerarHtmlRelatorio,
   gerarHtmlDashboard,
-  CSS,
   escapar,
   formatarData
 };

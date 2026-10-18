@@ -60,6 +60,8 @@ real, e as rotas de escrita continuam sem autenticação, apesar do limite de ta
 - Tarefa 22: validação da ideia de gestão de campanhas eleitorais com cinco evidências
   vinculadas, nota e relatório A4; as fontes e afirmações foram fornecidas pelo PO e não
   verificadas independentemente nesta execução
+- fix-14: design system CSS reutilizável, tema escuro, tipografia neo-grotesca e impressão A4,
+  aplicado ao dashboard e ao relatório
 
 ### Decisões do PO sobre acesso e apresentação
 
@@ -222,8 +224,9 @@ HTML A4. A descrição pode ser digitada ou extraída de uma imagem via OpenRout
   criptográfica, devolvido na resposta de `POST /validar-ideia`. Ele dá acesso ao relatório
   e não é mais adivinhável por timestamp: o formato antigo, `<ms>-<6 caracteres>`, permitia
   forçar o link com muito menos tentativas
-- Módulo `relatorio.js` gera as duas páginas, com o CSS embutido e sem recurso externo.
-  Sem dependência de PDF e sem Puppeteer: o PDF sai do navegador, por "Salvar como"
+- Módulo `relatorio.js` gera dashboard e relatório com folha de estilos local em
+  `public/styles.css`. Sem dependência de PDF e sem Puppeteer: o PDF sai do navegador, por
+  "Salvar como"
 - Endpoint `GET /nota` (a régua inteira: cinco critérios — "tem gente?", "tem gente
   insatisfeita?", "cabe mais um?", "alguém paga?" e "você alcança essas pessoas?")
 - Veredito derivado da nota, com campo novo na resposta: `decisao` (`PARAR`,
@@ -242,7 +245,7 @@ HTML A4. A descrição pode ser digitada ou extraída de uma imagem via OpenRout
 - `id` e `timestamp` das evidências gerados pelo servidor, nunca aceitos do cliente
 - Healthcheck `GET /saude`
 - Tratamento 400, 404, 405, 413
-- 122 testes automatizados (80 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
+- 123 testes automatizados (81 em `server.test.js` + 19 em `evidencias.test.js` + 23 em
   `nota.test.js`)
 - **Leitura de `.jsonl` resiliente e unificada**: `validacoes.jsonl` e `evidencias.jsonl` são
   lidos pela mesma função, em `jsonl.js`. Linha corrompida é ignorada com aviso em
@@ -264,6 +267,9 @@ HTML A4. A descrição pode ser digitada ou extraída de uma imagem via OpenRout
 - **Avisos de portfólio na interface**: banner no topo do dashboard dizendo que os dados são
   fictícios ou de demonstração, aviso de que a nota depende da qualidade das evidências, e
   rodapé com o perfil do autor e botão "Ver código-fonte" para o repositório
+- **Design system do portfólio** em `public/styles.css`: paleta Schwartz Unleashed, tema escuro,
+  hierarquia neo-grotesca e utilitários de botão, cartão, badge e código. Compartilhado pelo
+  dashboard e relatório; preparado para reutilização nos próximos apps e com impressão A4 clara.
 - **Limite de taxa por IP nas rotas caras**, em `rate-limit.js`, sem dependência externa.
   `POST /validar-ideia` 10 por minuto, `POST /evidencias` 30, `GET /evidencias` sem filtro
   30, e 60 para relatório, nota e dashboard. A requisição barrada recebe `429` com
@@ -345,7 +351,7 @@ GitHub guarda o histórico. Nenhum dos dois deve ser abandonado.
 ```bash
 npm install     # instala dependências (apenas express)
 npm start       # sobe o servidor em http://localhost:3000
-npm test        # roda os 120 testes automatizados
+  npm test        # roda os 123 testes automatizados
 ```
 
 Exemplos de chamada:

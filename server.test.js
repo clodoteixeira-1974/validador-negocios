@@ -295,11 +295,13 @@ test('GET /relatorio/:id inclui a imagem salva na validacao', async () => {
 
     const resposta = await fetch(`${base}/relatorio/${validacao.corpo.id}`);
     const html = await resposta.text();
+    const respostaCss = await fetch(`${base}/styles.css`);
+    const css = await respostaCss.text();
 
     assert.equal(resposta.status, 200);
     assert.match(html, /<img class="imagem-validacao" src="data:image\/png;base64,aGVsbG8="/);
-    assert.match(html, /max-width:\s*100%/);
-    assert.match(html, /page-break-inside:\s*avoid/);
+    assert.match(css, /\.imagem-validacao\s*\{[^}]*max-width:\s*100%/s);
+    assert.match(css, /\.imagem-validacao\s*\{[^}]*page-break-inside:\s*avoid/s);
   }, {
     openRouterApiKey: 'chave-de-teste',
     fetchOpenRouter: async () => ({
@@ -953,6 +955,7 @@ test('GET /dashboard: 200 com HTML, formulário e botão de copiar', async () =>
 
     assert.equal(resposta.status, 200);
     assert.match(resposta.headers.get('content-type') || '', /text\/html/);
+    assert.ok(corpo.includes('<link rel="stylesheet" href="/styles.css">'));
 
     // Formulário para enviar a ideia.
     assert.match(corpo, /<textarea/);
@@ -974,7 +977,6 @@ test('GET /dashboard: 200 com HTML, formulário e botão de copiar', async () =>
     assert.match(corpo, /Erro ao copiar/);
 
     // O aviso começa escondido e some depois de 2 segundos.
-    assert.match(corpo, /\.aviso\.oculto \{\s*\n?\s*display: none;/);
     assert.match(corpo, /2000/);
 
     // O JavaScript fala com as rotas da API.
@@ -987,13 +989,12 @@ test('GET /dashboard: 200 com HTML, formulário e botão de copiar', async () =>
     // absoluta. Por isso a checagem passou a mirar o que é realmente baixado —
     // <a href> é navegação só quando a pessoa clica, não é recurso carregado.
     assert.ok(!/<script[^>]+src=/.test(corpo), 'nenhum script externo');
-    assert.ok(!/<link[^>]+href=/.test(corpo), 'nenhuma folha de estilo externa');
     assert.ok(!/<img[^>]+src=/.test(corpo), 'nenhuma imagem externa');
     assert.ok(!corpo.includes('@import'), 'nenhum @import de fonte');
     assert.ok(!/<iframe/.test(corpo), 'nenhum iframe');
 
     // E os links de portfólio estão lá, como a decisão do PO pede.
-    assert.match(corpo, /<a class="botao-secundario" href="https:\/\/github\.com\/clodoteixeira-1974\/validador-negocios"/);
+    assert.match(corpo, /<a class="botao-secundario btn-secundario" href="https:\/\/github\.com\/clodoteixeira-1974\/validador-negocios"/);
     assert.match(corpo, /Ver código-fonte/);
   });
 });
@@ -1004,19 +1005,41 @@ test('o HTML do relatório traz @page A4 e @media print escondendo os controles'
 
     const resposta = await fetch(`${base}/relatorio/${validacao.corpo.id}`);
     const corpo = await resposta.text();
+    const respostaCss = await fetch(`${base}/styles.css`);
+    const css = await respostaCss.text();
+
+    assert.ok(corpo.includes('<link rel="stylesheet" href="/styles.css">'));
+    assert.ok(corpo.includes('<a class="no-print" href="'));
+    assert.equal(respostaCss.status, 200);
+    assert.match(respostaCss.headers.get('content-type') || '', /text\/css/);
 
     // Página A4 com margem de 2cm.
-    assert.match(corpo, /@page/);
-    assert.match(corpo, /size:\s*A4/);
-    assert.match(corpo, /margin:\s*2cm/);
+    assert.match(css, /@page/);
+    assert.match(css, /size:\s*A4/);
+    assert.match(css, /margin:\s*2cm/);
 
     // Regras de impressão que escondem botões e painéis.
-    assert.match(corpo, /@media print/);
-    assert.match(corpo, /button/);
+    assert.match(css, /@media print/);
+    assert.match(css, /\.no-print/);
+    assert.match(css, /button/);
 
-    // E nenhum recurso externo: o CSS é embutido.
-    assert.ok(!corpo.includes('<link '), 'nenhum CSS externo');
+    // O relatório usa CSS externo local e não carrega JavaScript.
+    assert.ok(!/<style/i.test(corpo), 'CSS não embutido no relatório');
     assert.ok(!/<script/i.test(corpo), 'relatório não deve ter JavaScript');
+  });
+});
+
+test('GET /styles.css: 200 com content-type text/css', async () => {
+  await comServidor(async ({ base }) => {
+    const resposta = await fetch(`${base}/styles.css`);
+    const css = await resposta.text();
+
+    assert.equal(resposta.status, 200);
+    assert.match(resposta.headers.get('content-type') || '', /text\/css/);
+    assert.match(css, /--cor-azul:\s*#015875/);
+    assert.match(css, /\.btn-primario/);
+    assert.match(css, /\.card/);
+    assert.match(css, /\.code-block/);
   });
 });
 

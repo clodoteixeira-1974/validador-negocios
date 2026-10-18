@@ -214,7 +214,23 @@ Para rodar os testes:
 npm test
 ```
 
-São 120 testes automatizados, todos passando.
+São 123 testes automatizados, todos passando.
+
+### Design system do portfólio
+
+`public/styles.css` contém um design system CSS puro, servido localmente em `/styles.css` e
+reutilizável pelos próximos apps do portfólio. O tema padrão é escuro e usa a paleta Schwartz
+Unleashed: preto `#000000`, azul petróleo `#015875`, vermelho `#FF0000`, vinho `#99164E` e
+laranja `#F47C19`, com texto suavizado `#F4F4F5` e cartões `#0D1117`.
+
+A tipografia segue o equilíbrio neo-grotesco: Plus Jakarta Sans ou Inter nos títulos, Inter no
+corpo e JetBrains Mono ou Fira Code para código. As fontes têm fallbacks de sistema e não são
+baixadas de serviços externos.
+
+As classes utilitárias `.btn-primario`, `.btn-secundario`, `.btn-perigo`, `.card`, `.badge` e
+`.code-block` estabelecem estilos compartilháveis. O arquivo também contém os componentes do
+dashboard e do relatório, responsividade e regras de impressão A4: fundo branco, texto preto,
+margens de 2 cm e ocultação de `.no-print`.
 
 ### Envio de imagem e OpenRouter
 
@@ -399,7 +415,7 @@ decisão, e é descrito na seção seguinte.
 | `nota.js`                           | Módulo da nota de viabilidade. Aplica os critérios da régua e deriva o veredito.                           |
 | `nota.test.js`                      | 23 testes do cálculo da nota e do veredito, sem HTTP e sem disco.                                          |
 | `jsonl.js`                          | Leitura e escrita dos arquivos JSON Lines, compartilhadas pelos dois módulos.                              |
-| `relatorio.js`                      | Gera o HTML do relatório A4 e do dashboard, com o CSS embutido.                                            |
+| `relatorio.js`                      | Gera o HTML do relatório A4 e do dashboard, usando `public/styles.css`.                                   |
 | `testar-evidencias.js`              | Script de verificação manual do módulo de evidências.                                                     |
 | `package.json`                      | Nome do projeto e os comandos `start` e `test`.                                                          |
 | `validacoes.jsonl`                  | Registro das validações recebidas (gerado em execução, não versionado).                                  |
@@ -420,7 +436,7 @@ Fase avançada: o serviço de validação e classificação está funcionando, a
 completa com os cinco critérios, cada nota vem com um veredito, e a nota é **por ideia**:
 as evidências se vinculam ao identificador da validação, e o relatório mostra a nota
 correta daquela ideia. Há um dashboard em HTML que gera um relatório A4 com link para
-compartilhar. São 120 testes automatizados, todos passando.
+compartilhar. São 123 testes automatizados, todos passando.
 
 O serviço é **público e de portfólio**, com isso avisado na própria interface: banner no
 dashboard, aviso de que os dados são de demonstração, aviso de que a qualidade da nota

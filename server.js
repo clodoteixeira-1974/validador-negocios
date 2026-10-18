@@ -270,6 +270,7 @@ function createApp(opcoes = {}) {
   // As demais rotas mantêm o limite original de 100 KB.
   app.use('/validar-ideia', express.json({ limit: LIMITE_CORPO_VALIDAR }));
   app.use(express.json({ limit: LIMITE_CORPO }));
+  app.use(express.static(path.join(__dirname, 'public')));
 
   // Healthcheck
   app.get('/saude', (req, res) => {
