@@ -233,8 +233,10 @@ As classes utilitárias `.btn-primario`, `.btn-secundario`, `.btn-perigo`, `.car
 dashboard e do relatório, responsividade e regras de impressão A4: fundo `#F9F8F6`, cartão branco,
 texto `#141413`, margens de 2 cm e ocultação de `.no-print`.
 
-O rodapé do dashboard identifica o stack e as competências do portfólio, e o controle de arquivo
-usa um botão “Escolher arquivo” próprio para ocultar o texto de estado nativo do navegador.
+O dashboard apresenta o formulário como uma caixa de composição fluida, com título centralizado,
+ícone de anexo e envio por seta. O input nativo de arquivo permanece acessível, mas é visualmente
+oculto para não exibir o texto residual do navegador. O rodapé identifica o stack e as competências
+do portfólio.
 
 ### Envio de imagem e OpenRouter
 

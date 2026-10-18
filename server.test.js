@@ -956,15 +956,20 @@ test('GET /dashboard: 200 com HTML, formulário e botão de copiar', async () =>
     assert.equal(resposta.status, 200);
     assert.match(resposta.headers.get('content-type') || '', /text\/html/);
     assert.ok(corpo.includes('<link rel="stylesheet" href="/styles.css">'));
+    assert.match(corpo, /Boa tarde, Clodoaldo/);
 
     // Formulário para enviar a ideia.
     assert.match(corpo, /<textarea/);
     assert.match(corpo, /id="ideia"/);
     assert.match(corpo, /<input id="imagem" type="file" accept="image\/\*">/);
-    assert.ok(corpo.includes('<label class="btn-secundario upload-botao" for="imagem">Escolher arquivo</label>'));
+    assert.ok(corpo.includes('<label class="composer-attach" for="imagem" aria-label="Anexar imagem" title="Anexar imagem">+</label>'));
+    assert.ok(corpo.includes('class="composer"'));
+    assert.ok(corpo.includes('Escolher arquivo') === false);
+    assert.ok(!corpo.includes('Nenhum arquivo selecionado'));
+    assert.ok(!corpo.includes('No file chosen'));
     assert.match(corpo, /readAsDataURL/);
     assert.match(corpo, /preview-imagem/);
-    assert.ok(corpo.includes('<button class="btn-primario" id="enviar" type="button">Validar ideia</button>'));
+    assert.ok(corpo.includes('<button class="btn-primario composer-send" id="enviar" type="button" aria-label="Validar ideia" title="Validar ideia"><span aria-hidden="true">↑</span><span class="sr-only">Validar ideia</span></button>'));
     assert.ok(corpo.includes('<button class="btn-secundario" id="copiar" type="button">Copiar link do relatório</button>'));
     assert.match(corpo, /Validar ideia/);
 
@@ -1049,13 +1054,15 @@ test('GET /styles.css: 200 com content-type text/css', async () => {
     assert.match(css, /--cor-texto-principal:\s*#141413/);
     assert.match(css, /--cor-texto-secundario:\s*#6B6B66/);
     assert.match(css, /--cor-texto-botao:\s*#FFFFFF/);
+    assert.match(css, /--fonte-corpo:\s*'Plus Jakarta Sans', 'Inter'/);
     assert.match(css, /\.btn-primario/);
     assert.match(css, /--cor-laranja:\s*#D97757/);
     assert.match(css, /\.btn-primario\s*\{[^}]*color:\s*var\(--cor-texto-botao\);[^}]*background:\s*var\(--cor-laranja\);/s);
-    assert.match(css, /\.banner\s*\{[^}]*background:\s*rgba\(217, 119, 87, 0\.1\);/s);
-    assert.match(css, /\.painel\.card\s*\{[^}]*box-shadow:\s*0 2px 8px rgba\(20, 20, 19, 0\.06\)/s);
-    assert.match(css, /\.campo-imagem input\[type="file"\]\s*\{[^}]*clip-path:\s*inset\(50%\)/s);
-    assert.match(css, /\.campo-imagem input\[type="file"\]:focus-visible \+ \.upload-botao/);
+    assert.match(css, /\.banner\s*\{[^}]*background:\s*#F4F2EF;/s);
+    assert.match(css, /\.composer\s*\{[^}]*background:\s*#FFFFFF;[^}]*border-radius:\s*16px/s);
+    assert.match(css, /\.composer\s*\{[^}]*box-shadow:\s*0 4px 14px rgba\(20, 20, 19, 0\.07\)/s);
+    assert.match(css, /\.composer input\[type="file"\]\s*\{[^}]*clip-path:\s*inset\(50%\)/s);
+    assert.match(css, /\.composer input\[type="file"\]:focus-visible ~ \.composer-controls \.composer-attach/);
     assert.match(css, /\.vitrine \.vitrine-skills/);
     assert.match(css, /\.card/);
     assert.match(css, /\.code-block/);
@@ -1498,7 +1505,7 @@ test('o dashboard avisa que é projeto de portfólio e aponta o código-fonte', 
     const corpo = await resposta.text();
 
     assert.equal(resposta.status, 200);
-    assert.ok(corpo.includes('Este é um projeto de portfólio.'));
+    assert.ok(corpo.includes('Projeto de portfólio'));
     assert.ok(corpo.includes('Não use para decisões de negócio'));
     assert.ok(corpo.includes('As evidências são fornecidas por usuários'));
     assert.ok(corpo.includes('A qualidade da nota'));

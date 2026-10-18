@@ -13,7 +13,7 @@
   --cor-borda-suave: #D6D3CB;
   --cor-sucesso: #3C7A57;
   --fonte-titulo: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
-  --fonte-corpo: 'Inter', system-ui, sans-serif;
+  --fonte-corpo: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   --fonte-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
@@ -24,6 +24,7 @@
 body {
   margin: 0;
   padding: 24px;
+  min-height: 100vh;
   color: var(--cor-texto-principal);
   background: var(--cor-fundo);
   font-family: var(--fonte-corpo);
@@ -327,25 +328,221 @@ td.pontos {
   break-inside: avoid;
 }
 
-.painel {
+.dashboard-shell {
   width: 100%;
-  max-width: 720px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 28px;
+  min-height: calc(100vh - 48px);
 }
 
-.painel.card {
-  border-color: #ECEAE6;
-  box-shadow: 0 2px 8px rgba(20, 20, 19, 0.06);
+.dashboard-top {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.plan-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  color: var(--cor-texto-secundario);
+  background: #F1F0ED;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.plan-chip span:first-child {
+  color: var(--cor-texto-principal);
+}
+
+.dashboard-main {
+  width: 100%;
+  max-width: 760px;
+  min-height: calc(100vh - 96px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 130px 0 24px;
+}
+
+.welcome-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.brand-mark {
+  color: var(--cor-laranja);
+  font-size: 42px;
+  line-height: 1;
+}
+
+.dashboard-title {
+  margin: 0;
+  color: var(--cor-texto-principal);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(32px, 5vw, 42px);
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.composer {
+  width: min(100%, 642px);
+  padding: 14px 14px 10px;
+  background: #FFFFFF;
+  border: 1px solid #D1D0CC;
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(20, 20, 19, 0.07);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.composer:focus-within {
+  border-color: #B8B5AF;
+  box-shadow: 0 5px 18px rgba(20, 20, 19, 0.09);
+}
+
+.composer textarea {
+  display: block;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 3px 8px;
+  color: var(--cor-texto-principal);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.composer textarea::placeholder {
+  color: var(--cor-texto-secundario);
+}
+
+.composer textarea:focus-visible {
+  outline: none;
+}
+
+.composer input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.preview-imagem {
+  display: block;
+  max-width: 100%;
+  max-height: 120px;
+  margin: 4px 2px 10px;
+  border-radius: 8px;
+  page-break-inside: avoid;
+}
+
+.preview-imagem[hidden] {
+  display: none;
+}
+
+.composer-controls,
+.composer-left,
+.composer-right {
+  display: flex;
+  align-items: center;
+}
+
+.composer-controls {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.composer-left,
+.composer-right {
+  gap: 10px;
+}
+
+.composer-attach {
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  color: var(--cor-texto-principal);
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.composer-attach:hover {
+  background: #F1F0ED;
+}
+
+.composer input[type="file"]:focus-visible ~ .composer-controls .composer-attach {
+  outline: 2px solid var(--cor-laranja);
+  outline-offset: 2px;
+}
+
+.composer-mode {
+  padding: 5px 10px;
+  color: var(--cor-texto-principal);
+  background: #F1F0ED;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.composer-meta {
+  color: var(--cor-texto-secundario);
+  font-size: 12px;
+}
+
+.composer-send {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 12px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .banner {
-  margin: 0 0 22px;
-  padding: 14px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
   color: var(--cor-texto-principal);
-  background: rgba(217, 119, 87, 0.1);
-  border: 1px solid rgba(217, 119, 87, 0.22);
+  background: #F4F2EF;
+  border: 1px solid #EBE8E3;
   border-radius: 6px;
+  font-size: 13px;
 }
 
 .banner strong {
@@ -380,58 +577,8 @@ textarea::placeholder {
   color: #77756E;
 }
 
-.entrada-ideia {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.45fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.campo-imagem {
-  min-width: 0;
-}
-
-.campo-imagem input[type="file"] {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  clip-path: inset(50%);
-  white-space: nowrap;
-  border: 0;
-}
-
-.upload-botao {
-  margin: 0 0 8px;
-  cursor: pointer;
-}
-
-.campo-imagem input[type="file"]:focus-visible + .upload-botao {
-  outline: 2px solid var(--cor-laranja);
-  outline-offset: 3px;
-}
-
-.preview-imagem {
-  display: block;
-  max-width: 100%;
-  max-height: 220px;
-  margin-top: 10px;
-  border-radius: 6px;
-  page-break-inside: avoid;
-}
-
-.preview-imagem[hidden] {
-  display: none;
-}
-
-.painel > button {
-  margin-top: 16px;
-}
-
 .resultado {
+  width: 100%;
   margin-top: 22px;
   padding-top: 18px;
   border-top: 1px solid var(--cor-borda-suave);
@@ -477,7 +624,9 @@ textarea::placeholder {
 }
 
 .vitrine {
-  margin-top: 26px;
+  width: 100%;
+  max-width: 760px;
+  margin: 24px auto 0;
   padding-top: 14px;
   color: var(--cor-texto-secundario);
   border-top: 1px solid var(--cor-borda-suave);
@@ -492,6 +641,11 @@ textarea::placeholder {
   margin: 8px 0 12px;
   color: var(--cor-texto-secundario);
   font-size: 12px;
+}
+
+.dashboard-main .banner,
+.dashboard-main .banner-suave {
+  width: min(100%, 642px);
 }
 
 .vitrine-links {
@@ -517,12 +671,40 @@ textarea::placeholder {
     font-size: 24px;
   }
 
-  .painel {
-    padding: 20px;
+  .dashboard-shell {
+    min-height: calc(100vh - 32px);
   }
 
-  .entrada-ideia {
-    grid-template-columns: 1fr;
+  .dashboard-main {
+    min-height: calc(100vh - 80px);
+    padding: 72px 0 32px;
+    gap: 18px;
+  }
+
+  .welcome-heading {
+    gap: 6px;
+  }
+
+  .brand-mark {
+    font-size: 32px;
+  }
+
+  .dashboard-title {
+    font-size: clamp(27px, 7vw, 34px);
+  }
+
+  .composer {
+    padding: 12px;
+  }
+
+  .composer-controls,
+  .composer-left,
+  .composer-right {
+    gap: 6px;
+  }
+
+  .composer-meta {
+    font-size: 10px;
   }
 
   .folha {
@@ -580,7 +762,7 @@ textarea::placeholder {
     box-shadow: none;
   }
 
-  .painel,
+  .dashboard-shell,
   .link-caixa,
   button,
   .aviso,

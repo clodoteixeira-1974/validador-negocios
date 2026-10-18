@@ -161,60 +161,71 @@ function gerarHtmlDashboard() {
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<main class="painel card">
-  <div class="banner">
-    <strong class="badge">Este é um projeto de portfólio.</strong>
-    <p>Os dados são fictícios ou de demonstração. Não use para decisões de negócio
-    reais.</p>
-  </div>
-
-  <h1>Validador de Novos Negócios</h1>
-  <p class="subtitulo">Descreva a ideia e veja a nota de viabilidade.</p>
-
-  <div class="entrada-ideia">
-    <div>
-      <label for="ideia">Sua ideia de negócio</label>
-      <textarea id="ideia" placeholder="Ex.: App para controlar gastos"></textarea>
+<main class="dashboard-shell">
+  <header class="dashboard-top">
+    <div class="plan-chip">
+      <span>Validador de Novos Negócios</span>
+      <span aria-hidden="true">·</span>
+      <span>Portfólio</span>
     </div>
-    <div class="campo-imagem">
-      <label for="imagem">Ou envie uma imagem</label>
+  </header>
+
+  <section class="dashboard-main" aria-labelledby="dashboard-title">
+    <div class="welcome-heading">
+      <span class="brand-mark" aria-hidden="true">✳</span>
+      <h1 class="dashboard-title" id="dashboard-title">Boa tarde, Clodoaldo</h1>
+    </div>
+
+    <div class="composer" role="group" aria-label="Nova ideia de negócio">
+      <label class="sr-only" for="ideia">Descreva sua ideia de negócio</label>
+      <textarea id="ideia" rows="2" placeholder="Descreva sua ideia de negócio..."></textarea>
       <input id="imagem" type="file" accept="image/*">
-      <label class="btn-secundario upload-botao" for="imagem">Escolher arquivo</label>
       <img id="preview-imagem" class="preview-imagem" alt="Pré-visualização da imagem selecionada" hidden>
+      <div class="composer-controls">
+        <div class="composer-left">
+          <label class="composer-attach" for="imagem" aria-label="Anexar imagem" title="Anexar imagem">+</label>
+          <span class="composer-mode">Ideia</span>
+        </div>
+        <div class="composer-right">
+          <span class="composer-meta">Régua determinística · 5 critérios</span>
+          <button class="btn-primario composer-send" id="enviar" type="button" aria-label="Validar ideia" title="Validar ideia"><span aria-hidden="true">↑</span><span class="sr-only">Validar ideia</span></button>
+        </div>
+      </div>
     </div>
-  </div>
-  <button class="btn-primario" id="enviar" type="button">Validar ideia</button>
 
-  <p class="banner-suave">As evidências são fornecidas por usuários. A qualidade da nota
-  depende da qualidade das evidências.</p>
+    <p class="aviso" id="aviso" hidden></p>
 
-  <p class="aviso" id="aviso" hidden></p>
+    <div class="resultado" id="resultado" hidden>
+      <h2>Resultado</h2>
+      <dl class="meta">
+        <dt>Ideia</dt><dd id="r-ideia"></dd>
+        <dt>Tipo</dt><dd id="r-tipo"></dd>
+        <dt>Nota</dt><dd id="r-nota"></dd>
+        <dt>Veredito</dt><dd id="r-veredito"></dd>
+        <dt>Explicação</dt><dd id="r-explicacao"></dd>
+      </dl>
 
-  <div class="resultado" id="resultado" hidden>
-    <h2>Resultado</h2>
-    <dl class="meta">
-      <dt>Ideia</dt><dd id="r-ideia"></dd>
-      <dt>Tipo</dt><dd id="r-tipo"></dd>
-      <dt>Nota</dt><dd id="r-nota"></dd>
-      <dt>Veredito</dt><dd id="r-veredito"></dd>
-      <dt>Explicação</dt><dd id="r-explicacao"></dd>
-    </dl>
+      <h2>Link do relatório</h2>
+      <p class="link-caixa code-block" id="r-link"></p>
+      <p class="banner-suave" id="r-expira"></p>
+      <button class="btn-secundario" id="copiar" type="button">Copiar link do relatório</button>
+      <div id="aviso-copia" class="aviso oculto" role="status" aria-live="polite">Link copiado!</div>
+    </div>
+  </section>
 
-    <h2>Link do relatório</h2>
-    <p class="link-caixa code-block" id="r-link"></p>
-    <p class="banner-suave" id="r-expira"></p>
-    <button class="btn-secundario" id="copiar" type="button">Copiar link do relatório</button>
-    <div id="aviso-copia" class="aviso oculto" role="status" aria-live="polite">Link copiado!</div>
-  </div>
-
-  <div class="vitrine">
+  <footer class="vitrine">
+    <div class="banner">
+      <strong class="badge">Projeto de portfólio</strong>
+      <p>Os dados são fictícios ou de demonstração. Não use para decisões de negócio reais.</p>
+    </div>
+    <p class="banner-suave">As evidências são fornecidas por usuários. A qualidade da nota depende da qualidade das evidências.</p>
     <p>Projeto de portfólio. Desenvolvido por
       <a href="${escapar(PERFIL_AUTOR)}">${escapar(AUTOR_PROJETO)}</a>.</p>
     <p class="vitrine-skills">Node.js · Express · OpenRouter · OpenAI Luna · CSS puro · RAG · Determinismo</p>
     <div class="vitrine-links">
       <a class="botao-secundario btn-secundario" href="${escapar(REPOSITORIO)}" rel="noopener">Ver código-fonte</a>
     </div>
-  </div>
+  </footer>
 </main>
 
 <script>

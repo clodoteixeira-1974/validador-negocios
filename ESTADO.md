@@ -68,6 +68,8 @@ real, e as rotas de escrita continuam sem autenticação, apesar do limite de ta
   texto `#141413` e primário `#D97757`; impressão preserva o tema claro
 - fix-17: contraste reforçado, painel branco com sombra sutil, upload customizado sem texto
   nativo residual e lista de tecnologias/competências no rodapé do dashboard
+- fix-18: dashboard reorganizado em layout de compositor fluido inspirado na referência Claude,
+  com título central, upload por ícone e envio por seta
 
 ### Decisões do PO sobre acesso e apresentação
 
