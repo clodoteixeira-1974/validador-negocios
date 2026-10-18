@@ -10,6 +10,7 @@ body-tmp.json
 *.tmp
 conversas/
 briefing-abertura.md
+opencode.json
 
 # Relatorios exportados do dashboard ("Salvar como PDF"). Sao saida local, com
 # dados desta maquina, e nao devem ir para o repositorio.
