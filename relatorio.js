@@ -179,6 +179,7 @@ function gerarHtmlDashboard() {
     <div class="campo-imagem">
       <label for="imagem">Ou envie uma imagem</label>
       <input id="imagem" type="file" accept="image/*">
+      <label class="btn-secundario upload-botao" for="imagem">Escolher arquivo</label>
       <img id="preview-imagem" class="preview-imagem" alt="Pré-visualização da imagem selecionada" hidden>
     </div>
   </div>
@@ -209,6 +210,7 @@ function gerarHtmlDashboard() {
   <div class="vitrine">
     <p>Projeto de portfólio. Desenvolvido por
       <a href="${escapar(PERFIL_AUTOR)}">${escapar(AUTOR_PROJETO)}</a>.</p>
+    <p class="vitrine-skills">Node.js · Express · OpenRouter · OpenAI Luna · CSS puro · RAG · Determinismo</p>
     <div class="vitrine-links">
       <a class="botao-secundario btn-secundario" href="${escapar(REPOSITORIO)}" rel="noopener">Ver código-fonte</a>
     </div>

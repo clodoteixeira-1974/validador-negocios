@@ -66,6 +66,8 @@ real, e as rotas de escrita continuam sem autenticação, apesar do limite de ta
   vermelho/vinho reservados a alertas específicos
 - fix-16: design system migrado para a paleta clara Claude, com fundo off-white, cartões bege,
   texto `#141413` e primário `#D97757`; impressão preserva o tema claro
+- fix-17: contraste reforçado, painel branco com sombra sutil, upload customizado sem texto
+  nativo residual e lista de tecnologias/competências no rodapé do dashboard
 
 ### Decisões do PO sobre acesso e apresentação
 
@@ -271,11 +273,13 @@ HTML A4. A descrição pode ser digitada ou extraída de uma imagem via OpenRout
 - **Avisos de portfólio na interface**: banner no topo do dashboard dizendo que os dados são
   fictícios ou de demonstração, aviso de que a nota depende da qualidade das evidências, e
   rodapé com o perfil do autor e botão "Ver código-fonte" para o repositório
-- **Design system do portfólio** em `public/styles.css`: tema claro Claude com fundo `#FAF9F5`,
-  cartões `#E8E6DC`, texto `#141413`, botão primário `#D97757`, hierarquia neo-grotesca e
-  utilitários de botão, cartão, badge e código. Compartilhado pelo dashboard e relatório,
-  preparado para reutilização nos próximos apps e com impressão A4 clara. Vermelho e vinho ficam
-  reservados a estados específicos de erro/perigo e badges de alerta.
+- **Design system do portfólio** em `public/styles.css`: tema claro Claude com fundo `#F9F8F6`,
+  painel branco `#FFFFFF`, texto principal `#141413`, secundário `#6B6B66` e botão primário
+  `#D97757` com texto branco. Inclui hierarquia neo-grotesca e utilitários de botão, cartão,
+  badge e código. Compartilhado pelo dashboard e relatório, preparado para reutilização nos
+  próximos apps e com impressão A4 clara. Vermelho e vinho ficam reservados a estados específicos
+  de erro/perigo e badges de alerta. O rodapé lista stack e competências, e o upload usa rótulo
+  customizado sem texto nativo de arquivo.
 - **Limite de taxa por IP nas rotas caras**, em `rate-limit.js`, sem dependência externa.
   `POST /validar-ideia` 10 por minuto, `POST /evidencias` 30, `GET /evidencias` sem filtro
   30, e 60 para relatório, nota e dashboard. A requisição barrada recebe `429` com

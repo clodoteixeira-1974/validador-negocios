@@ -961,6 +961,7 @@ test('GET /dashboard: 200 com HTML, formulário e botão de copiar', async () =>
     assert.match(corpo, /<textarea/);
     assert.match(corpo, /id="ideia"/);
     assert.match(corpo, /<input id="imagem" type="file" accept="image\/\*">/);
+    assert.ok(corpo.includes('<label class="btn-secundario upload-botao" for="imagem">Escolher arquivo</label>'));
     assert.match(corpo, /readAsDataURL/);
     assert.match(corpo, /preview-imagem/);
     assert.ok(corpo.includes('<button class="btn-primario" id="enviar" type="button">Validar ideia</button>'));
@@ -998,6 +999,7 @@ test('GET /dashboard: 200 com HTML, formulário e botão de copiar', async () =>
     // E os links de portfólio estão lá, como a decisão do PO pede.
     assert.match(corpo, /<a class="botao-secundario btn-secundario" href="https:\/\/github\.com\/clodoteixeira-1974\/validador-negocios"/);
     assert.match(corpo, /Ver código-fonte/);
+    assert.match(corpo, /Node\.js · Express · OpenRouter · OpenAI Luna · CSS puro · RAG · Determinismo/);
   });
 });
 
@@ -1025,8 +1027,8 @@ test('o HTML do relatório traz @page A4 e @media print escondendo os controles'
     assert.match(css, /\.no-print/);
     assert.match(css, /button/);
     assert.match(css, /color:\s*#141413 !important/);
-    assert.match(css, /background:\s*#FAF9F5 !important/);
-    assert.match(css, /background:\s*#E8E6DC !important/);
+    assert.match(css, /background:\s*#F9F8F6 !important/);
+    assert.match(css, /background:\s*#FFFFFF !important/);
 
     // O relatório usa CSS externo local e não carrega JavaScript.
     assert.ok(!/<style/i.test(corpo), 'CSS não embutido no relatório');
@@ -1042,14 +1044,19 @@ test('GET /styles.css: 200 com content-type text/css', async () => {
     assert.equal(resposta.status, 200);
     assert.match(resposta.headers.get('content-type') || '', /text\/css/);
     assert.match(css, /--cor-azul:\s*#015875/);
-    assert.match(css, /--cor-fundo:\s*#FAF9F5/);
-    assert.match(css, /--cor-fundo-card:\s*#E8E6DC/);
+    assert.match(css, /--cor-fundo:\s*#F9F8F6/);
+    assert.match(css, /--cor-fundo-card:\s*#FFFFFF/);
     assert.match(css, /--cor-texto-principal:\s*#141413/);
-    assert.match(css, /--cor-texto-secundario:\s*#B0AEA5/);
+    assert.match(css, /--cor-texto-secundario:\s*#6B6B66/);
+    assert.match(css, /--cor-texto-botao:\s*#FFFFFF/);
     assert.match(css, /\.btn-primario/);
     assert.match(css, /--cor-laranja:\s*#D97757/);
-    assert.match(css, /\.btn-primario\s*\{[^}]*color:\s*var\(--cor-fundo\);[^}]*background:\s*var\(--cor-laranja\);/s);
+    assert.match(css, /\.btn-primario\s*\{[^}]*color:\s*var\(--cor-texto-botao\);[^}]*background:\s*var\(--cor-laranja\);/s);
     assert.match(css, /\.banner\s*\{[^}]*background:\s*rgba\(217, 119, 87, 0\.1\);/s);
+    assert.match(css, /\.painel\.card\s*\{[^}]*box-shadow:\s*0 2px 8px rgba\(20, 20, 19, 0\.06\)/s);
+    assert.match(css, /\.campo-imagem input\[type="file"\]\s*\{[^}]*clip-path:\s*inset\(50%\)/s);
+    assert.match(css, /\.campo-imagem input\[type="file"\]:focus-visible \+ \.upload-botao/);
+    assert.match(css, /\.vitrine \.vitrine-skills/);
     assert.match(css, /\.card/);
     assert.match(css, /\.code-block/);
   });

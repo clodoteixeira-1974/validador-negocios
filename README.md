@@ -220,9 +220,9 @@ São 123 testes automatizados, todos passando.
 
 `public/styles.css` contém um design system CSS puro, servido localmente em `/styles.css` e
 reutilizável pelos próximos apps do portfólio. O tema padrão usa a paleta clara Claude: fundo
-off-white `#FAF9F5`, cartões `#E8E6DC`, texto principal `#141413`, secundário `#B0AEA5` e botão
-primário `#D97757` com texto off-white. Vermelho e vinho ficam reservados a estados de erro,
-perigo e badges de alerta específicos.
+`#F9F8F6`, painel branco `#FFFFFF`, texto principal `#141413`, secundário `#6B6B66` e botão
+primário `#D97757` com texto branco. Vermelho e vinho ficam reservados a estados de erro, perigo
+e badges de alerta específicos.
 
 A tipografia segue o equilíbrio neo-grotesco: Plus Jakarta Sans ou Inter nos títulos, Inter no
 corpo e JetBrains Mono ou Fira Code para código. As fontes têm fallbacks de sistema e não são
@@ -230,8 +230,11 @@ baixadas de serviços externos.
 
 As classes utilitárias `.btn-primario`, `.btn-secundario`, `.btn-perigo`, `.card`, `.badge` e
 `.code-block` estabelecem estilos compartilháveis. O arquivo também contém os componentes do
-dashboard e do relatório, responsividade e regras de impressão A4: fundo claro próximo ao da tela,
+dashboard e do relatório, responsividade e regras de impressão A4: fundo `#F9F8F6`, cartão branco,
 texto `#141413`, margens de 2 cm e ocultação de `.no-print`.
+
+O rodapé do dashboard identifica o stack e as competências do portfólio, e o controle de arquivo
+usa um botão “Escolher arquivo” próprio para ocultar o texto de estado nativo do navegador.
 
 ### Envio de imagem e OpenRouter
 
